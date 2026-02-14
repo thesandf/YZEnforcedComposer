@@ -1,0 +1,70 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Explicit permissions for security (CodeQL requirement)
+permissions:
+  contents: read  # Only need to read repository contents for testing
+
+env:
+  FOUNDRY_PROFILE: default
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        # Using major version tag - foundry-toolchain needs frequent updates for security fixes
+        # Maintained by official Foundry team: https://github.com/foundry-rs/foundry-toolchain
+        uses: foundry-rs/foundry-toolchain@v1 # codeql[skip-reason:trusted-action-needs-updates]
+        with:
+          version: nightly
+
+      - name: Run Forge build
+        run: |
+          forge --version
+          forge build --sizes --ignore-eip-3860
+        id: build
+
+      - name: Run Forge tests
+        run: |
+          forge test -vvv
+        id: test
+
+      - name: Run Forge snapshot
+        run: |
+          forge snapshot
+        id: snapshot
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        # Using major version tag - foundry-toolchain needs frequent updates for security fixes
+        uses: foundry-rs/foundry-toolchain@v1 # codeql[skip-reason:trusted-action-needs-updates]
+        with:
+          version: nightly
+
+      - name: Run Forge fmt check
+        run: |
+          forge fmt --check
+        id: fmt
+
+
+

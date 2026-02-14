@@ -1,0 +1,15 @@
+# Compiler files
+cache/
+out/
+
+# Broadcast logs
+!/broadcast
+
+# Docs
+/docs
+
+src/adapters
+src/registry
+
+# Dotenv
+.env
