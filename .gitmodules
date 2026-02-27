@@ -4,3 +4,5 @@
 [submodule "lib/lz-address-book"]
 	path = lib/lz-address-book
 	url = https://github.com/LayerZero-Labs/lz-address-book
+[submodule "lib/openzeppelin-contracts"]
+	path = lib/openzeppelin-contracts

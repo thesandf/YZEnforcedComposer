@@ -8,8 +8,5 @@ out/
 # Docs
 /docs
 
-src/adapters
-src/registry
-
 # Dotenv
 .env
