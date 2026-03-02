@@ -409,8 +409,8 @@ This is enforced by LayerZero's architecture. No partial state, no stuck funds.
 │   │   │             │                        │ WHITELIST │  │  │
 │   │   │ Anyone can  │ ◄────────────────────  │ Only      │  │  │
 │   │   │ deposit     │  setWhitelistEnabled   │ whitelisted│ │  │
-│   │   └─────────────┘      (false)           │ users     │  │  │
-│   │                                          └───────────┘  │  │
+│   │   │             │      (false)           │ users     │  │  │
+│   │   └─────────────┘                        └───────────┘  │  │
 │   │                                                         │  │
 │   └─────────────────────────────────────────────────────────┘  │
 │                                                                │

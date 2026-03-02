@@ -566,9 +566,9 @@ contract YZEnforcedComposer is VaultComposerSync {
      * @notice Test helper to set user deposit tracking directly
      * @dev Only for testing, should be removed in production
      */
-    function exposed_setUserDeposit(address _user, uint256 _amount) external onlyAdmin {
-        userDeposits[_user] = _amount;
-    }
+    // function exposed_setUserDeposit(address _user, uint256 _amount) external onlyAdmin {
+    //     userDeposits[_user] = _amount;
+    // }
 
     receive() external payable {}
 }
