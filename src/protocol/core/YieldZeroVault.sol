@@ -101,7 +101,7 @@ contract YieldZeroVault is ERC4626, Ownable, ReentrancyGuard {
     /**
      * @notice Get total assets in the vault
      */
-    function totalAssets() public view override returns (uint256) {
+    function totalAssets() public view virtual override returns (uint256) {
         // In production: idle balance + deployed in strategies
         return IERC20(asset()).balanceOf(address(this));
     }
@@ -111,6 +111,7 @@ contract YieldZeroVault is ERC4626, Ownable, ReentrancyGuard {
      */
     function deposit(uint256 assets, address receiver)
         public
+        virtual
         override
         onlyComposer
         whenNotPaused
@@ -139,6 +140,7 @@ contract YieldZeroVault is ERC4626, Ownable, ReentrancyGuard {
      */
     function redeem(uint256 shares, address receiver, address owner)
         public
+        virtual
         override
         onlyComposer
         whenNotPaused

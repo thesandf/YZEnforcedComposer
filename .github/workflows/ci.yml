@@ -1,0 +1,40 @@
+name: Core CI Pipeline
+
+permissions: {}
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  check:
+    name: Foundry Project Verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Show Forge version
+        run: forge --version
+
+      - name: Run Forge format check
+        run: forge fmt --check
+
+      - name: Run Forge build
+        run: forge build --sizes
+
+      - name: Run Forge tests
+        run: forge test -vvv

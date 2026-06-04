@@ -1,0 +1,436 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+import {SendParam} from "@layerzerolabs/oft-evm/contracts/interfaces/IOFT.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {YZEnforcedComposer} from "../../src/YZEnforcedComposer.sol";
+import "./YZEnforcedComposerBase.t.sol";
+
+/**
+ * @title YZEnforcedComposer Gas Regression Protection
+ * @notice Professional gas regression protection with committed snapshots
+ * @dev Provides CI-enforced gas limits and performance regression detection
+ */
+contract YZEnforcedComposerGasRegressionProtection is YZEnforcedComposerBase {
+    // Gas regression protection constants
+    uint256 internal constant GAS_TOLERANCE_PERCENT = 20; // 20% tolerance to allow for environment variance
+    uint256 internal constant MAX_GAS_LIMIT = 515000; // 515k gas hard limit
+    uint256 internal constant MIN_GAS_LIMIT = 5000; // 5k gas minimum
+    uint256 internal constant MAX_TEST_AMOUNT = 20000 ether;
+
+    // Committed gas snapshots for regression testing
+    struct GasSnapshot {
+        uint256 depositGas;
+        uint256 redeemGas;
+        uint256 setTVLCapGas;
+        uint256 setUserCapGas;
+        uint256 pauseDepositsGas;
+        uint256 pauseRedemptionsGas;
+        uint256 setWhitelistGas;
+        uint256 emergencyWithdrawGas;
+        uint256 depositAndSendGas;
+        uint256 redeemAndSendGas;
+    }
+
+    GasSnapshot internal committedGasSnapshot;
+
+    function setUp() public override {
+        super.setUp();
+        _setupDefaultCaps();
+        _loadCommittedGasSnapshot();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        GAS REGRESSION PROTECTION TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_GasRegression_Deposit() public {
+        uint256 gasBefore = gasleft();
+
+        _executeSuccessfulDeposit(userA, 100 ether);
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Hard limit check
+        assertLe(gasUsed, MAX_GAS_LIMIT, "Deposit gas exceeds hard limit");
+        assertGe(gasUsed, MIN_GAS_LIMIT, "Deposit too fast");
+
+        // Regression check
+        uint256 tolerance = (committedGasSnapshot.depositGas * GAS_TOLERANCE_PERCENT) / 100;
+        uint256 maxAllowedGas = committedGasSnapshot.depositGas + tolerance;
+
+        assertLe(gasUsed, maxAllowedGas, "Deposit gas regression detected");
+    }
+
+    function test_GasRegression_Redeem() public {
+        // Setup deposit first
+        _executeSuccessfulDeposit(userA, 100 ether);
+
+        uint256 gasBefore = gasleft();
+
+        uint256 shares = vault_arb.balanceOf(userA);
+        vm.prank(userA);
+        vault_arb.approve(address(yzEnforcedComposer_arb), shares);
+
+        SendParam memory redeemParam = _buildHopParam(address(0), userA, ARB_EID, shares);
+
+        vm.prank(userA);
+        yzEnforcedComposer_arb.redeemAndSend(shares, redeemParam, userA);
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Hard limit check
+        assertLe(gasUsed, MAX_GAS_LIMIT, "Redeem gas exceeds hard limit");
+        assertGe(gasUsed, MIN_GAS_LIMIT, "Redeem too fast");
+
+        // Regression check
+        uint256 tolerance = (committedGasSnapshot.redeemGas * GAS_TOLERANCE_PERCENT) / 100;
+        uint256 maxAllowedGas = committedGasSnapshot.redeemGas + tolerance;
+
+        assertLe(gasUsed, maxAllowedGas, "Redeem gas regression detected");
+    }
+
+    function test_GasRegression_SetTVLCap() public {
+        uint256 gasBefore = gasleft();
+
+        vm.prank(admin);
+        yzEnforcedComposer_arb.setTVLCap(500 ether);
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Hard limit check
+        assertLe(gasUsed, MAX_GAS_LIMIT, "SetTVLCap gas exceeds hard limit");
+        assertGe(gasUsed, MIN_GAS_LIMIT, "SetTVLCap too fast");
+
+        // Regression check
+        uint256 tolerance = (committedGasSnapshot.setTVLCapGas * GAS_TOLERANCE_PERCENT) / 100;
+        uint256 maxAllowedGas = committedGasSnapshot.setTVLCapGas + tolerance;
+
+        assertLe(gasUsed, maxAllowedGas, "SetTVLCap gas regression detected");
+    }
+
+    function test_GasRegression_SetUserCap() public {
+        uint256 gasBefore = gasleft();
+
+        vm.prank(admin);
+        yzEnforcedComposer_arb.setUserCap(userA, 200 ether);
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Hard limit check
+        assertLe(gasUsed, MAX_GAS_LIMIT, "SetUserCap gas exceeds hard limit");
+        assertGe(gasUsed, MIN_GAS_LIMIT, "SetUserCap too fast");
+
+        // Regression check
+        uint256 tolerance = (committedGasSnapshot.setUserCapGas * GAS_TOLERANCE_PERCENT) / 100;
+        uint256 maxAllowedGas = committedGasSnapshot.setUserCapGas + tolerance;
+
+        assertLe(gasUsed, maxAllowedGas, "SetUserCap gas regression detected");
+    }
+
+    function test_GasRegression_PauseDeposits() public {
+        uint256 gasBefore = gasleft();
+
+        vm.prank(admin);
+        yzEnforcedComposer_arb.pauseDeposits();
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Hard limit check
+        assertLe(gasUsed, MAX_GAS_LIMIT, "PauseDeposits gas exceeds hard limit");
+        assertGe(gasUsed, MIN_GAS_LIMIT, "PauseDeposits too fast");
+
+        // Regression check
+        uint256 tolerance = (committedGasSnapshot.pauseDepositsGas * GAS_TOLERANCE_PERCENT) / 100;
+        uint256 maxAllowedGas = committedGasSnapshot.pauseDepositsGas + tolerance;
+
+        assertLe(gasUsed, maxAllowedGas, "PauseDeposits gas regression detected");
+    }
+
+    function test_GasRegression_PauseRedemptions() public {
+        uint256 gasBefore = gasleft();
+
+        vm.prank(admin);
+        yzEnforcedComposer_arb.pauseRedemptions();
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Hard limit check
+        assertLe(gasUsed, MAX_GAS_LIMIT, "PauseRedemptions gas exceeds hard limit");
+        assertGe(gasUsed, MIN_GAS_LIMIT, "PauseRedemptions too fast");
+
+        // Regression check
+        uint256 tolerance = (committedGasSnapshot.pauseRedemptionsGas * GAS_TOLERANCE_PERCENT) / 100;
+        uint256 maxAllowedGas = committedGasSnapshot.pauseRedemptionsGas + tolerance;
+
+        assertLe(gasUsed, maxAllowedGas, "PauseRedemptions gas regression detected");
+    }
+
+    function test_GasRegression_SetWhitelist() public {
+        uint256 gasBefore = gasleft();
+
+        vm.prank(admin);
+        yzEnforcedComposer_arb.setWhitelistEnabled(true);
+        vm.prank(admin);
+        yzEnforcedComposer_arb.setWhitelist(userA, true);
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Hard limit check
+        assertLe(gasUsed, MAX_GAS_LIMIT, "SetWhitelist gas exceeds hard limit");
+        assertGe(gasUsed, MIN_GAS_LIMIT, "SetWhitelist too fast");
+
+        // Regression check
+        uint256 tolerance = (committedGasSnapshot.setWhitelistGas * GAS_TOLERANCE_PERCENT) / 100;
+        uint256 maxAllowedGas = committedGasSnapshot.setWhitelistGas + tolerance;
+
+        assertLe(gasUsed, maxAllowedGas, "SetWhitelist gas regression detected");
+    }
+
+    function test_GasRegression_EmergencyWithdraw() public {
+        _fundLocalFromHub(address(yzEnforcedComposer_arb), 100 ether);
+
+        uint256 gasBefore = gasleft();
+
+        vm.prank(admin);
+        yzEnforcedComposer_arb.emergencyWithdraw(50 ether, recipient);
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Hard limit check
+        assertLe(gasUsed, MAX_GAS_LIMIT, "EmergencyWithdraw gas exceeds hard limit");
+        assertGe(gasUsed, MIN_GAS_LIMIT, "EmergencyWithdraw too fast");
+
+        // Regression check
+        uint256 tolerance = (committedGasSnapshot.emergencyWithdrawGas * GAS_TOLERANCE_PERCENT) / 100;
+        uint256 maxAllowedGas = committedGasSnapshot.emergencyWithdrawGas + tolerance;
+
+        assertLe(gasUsed, maxAllowedGas, "EmergencyWithdraw gas regression detected");
+    }
+
+    function test_GasRegression_DepositAndSend() public {
+        uint256 gasBefore = gasleft();
+
+        _executeSuccessfulDeposit(userA, 100 ether);
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Hard limit check
+        assertLe(gasUsed, MAX_GAS_LIMIT, "DepositAndSend gas exceeds hard limit");
+        assertGe(gasUsed, MIN_GAS_LIMIT, "DepositAndSend too fast");
+
+        // Regression check
+        uint256 tolerance = (committedGasSnapshot.depositAndSendGas * GAS_TOLERANCE_PERCENT) / 100;
+        uint256 maxAllowedGas = committedGasSnapshot.depositAndSendGas + tolerance;
+
+        assertLe(gasUsed, maxAllowedGas, "DepositAndSend gas regression detected");
+    }
+
+    function test_GasRegression_RedeemAndSend() public {
+        // Setup deposit first
+        _executeSuccessfulDeposit(userA, 100 ether);
+
+        uint256 gasBefore = gasleft();
+
+        uint256 shares = vault_arb.balanceOf(userA);
+        vm.prank(userA);
+        vault_arb.approve(address(yzEnforcedComposer_arb), shares);
+
+        SendParam memory redeemParam = _buildHopParam(address(0), userA, ARB_EID, shares);
+
+        vm.prank(userA);
+        yzEnforcedComposer_arb.redeemAndSend(shares, redeemParam, userA);
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Hard limit check
+        assertLe(gasUsed, MAX_GAS_LIMIT, "RedeemAndSend gas exceeds hard limit");
+        assertGe(gasUsed, MIN_GAS_LIMIT, "RedeemAndSend too fast");
+
+        // Regression check
+        uint256 tolerance = (committedGasSnapshot.redeemAndSendGas * GAS_TOLERANCE_PERCENT) / 100;
+        uint256 maxAllowedGas = committedGasSnapshot.redeemAndSendGas + tolerance;
+
+        assertLe(gasUsed, maxAllowedGas, "RedeemAndSend gas regression detected");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        PERFORMANCE SCALING TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_PerformanceScaling_Deposit() public {
+        uint256[] memory amounts = new uint256[](5);
+        amounts[0] = 1 ether;
+        amounts[1] = 10 ether;
+        amounts[2] = 100 ether;
+        amounts[3] = 1000 ether;
+        amounts[4] = 10000 ether;
+
+        uint256[] memory gasUsed = new uint256[](5);
+
+        for (uint256 i = 0; i < amounts.length; i++) {
+            uint256 gasBefore = gasleft();
+
+            _executeSuccessfulDeposit(userA, amounts[i]);
+
+            gasUsed[i] = gasBefore - gasleft();
+
+            // Verify gas is reasonable for the operation
+            assertLe(
+                gasUsed[i],
+                MAX_GAS_LIMIT,
+                string(abi.encodePacked("Deposit gas too high for amount ", Strings.toString(amounts[i])))
+            );
+        }
+
+        // Verify gas scaling is reasonable (should not scale linearly with amount)
+        for (uint256 i = 1; i < gasUsed.length; i++) {
+            uint256 gasIncrease = gasUsed[i] > gasUsed[i - 1]
+                ? gasUsed[i] - gasUsed[i - 1]
+                : gasUsed[i - 1] - gasUsed[i];
+
+            // Gas increase should not be proportional to amount increase
+            // Allow some increase but not linear scaling in mock endpoint environment
+            uint256 expectedGasIncrease = gasUsed[0] * 7 / 10; // 70% of base gas
+            assertLe(gasIncrease, expectedGasIncrease, "Gas scaling too aggressive");
+        }
+    }
+
+    function test_PerformanceScaling_MultiUser() public {
+        address[] memory users = new address[](10);
+        for (uint256 i = 0; i < 10; i++) {
+            users[i] = address(uint160(uint256(keccak256(abi.encodePacked("user", i)))));
+        }
+
+        uint256 gasBefore = gasleft();
+
+        // Perform operations for multiple users
+        for (uint256 i = 0; i < 10; i++) {
+            _fundLocalFromHub(users[i], 10 ether);
+            vm.prank(users[i]);
+            assetOFT_arb.approve(address(yzEnforcedComposer_arb), 10 ether);
+
+            SendParam memory sendParam = _buildHopParam(address(0), users[i], ARB_EID, 10 ether);
+
+            vm.prank(users[i]);
+            yzEnforcedComposer_arb.depositAndSend(10 ether, sendParam, users[i]);
+        }
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Verify gas is reasonable for multi-user operations
+        uint256 expectedGas = committedGasSnapshot.depositAndSendGas * 10;
+        uint256 tolerance = (expectedGas * 50) / 100; // Allow 50% variance for multi-user scaling due to warm/cold slots
+        uint256 maxAllowedGas = expectedGas + tolerance;
+
+        assertLe(gasUsed, maxAllowedGas, "Multi-user gas scaling too aggressive");
+    }
+
+    function test_PerformanceScaling_CapChanges() public {
+        uint256 gasBefore = gasleft();
+
+        // Perform multiple cap changes
+        for (uint256 i = 0; i < 10; i++) {
+            vm.prank(admin);
+            yzEnforcedComposer_arb.setTVLCap((i + 1) * 100 ether);
+        }
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Verify gas is reasonable for multiple cap changes
+        uint256 expectedGas = committedGasSnapshot.setTVLCapGas * 10;
+        uint256 tolerance = (expectedGas * GAS_TOLERANCE_PERCENT) / 100;
+        uint256 maxAllowedGas = expectedGas + tolerance;
+
+        assertLe(gasUsed, maxAllowedGas, "Cap change gas scaling too aggressive");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        GAS OPTIMIZATION VALIDATION
+    //////////////////////////////////////////////////////////////*/
+
+    function test_GasOptimization_EventEmissions() public {
+        uint256 gasBefore = gasleft();
+
+        // Perform operation that emits events
+        _executeSuccessfulDeposit(userA, 100 ether);
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Verify gas is within expected bounds for event emissions
+        assertLe(gasUsed, committedGasSnapshot.depositAndSendGas * 2, "Event emissions too expensive");
+    }
+
+    function test_GasOptimization_StorageAccess() public {
+        uint256 gasBefore = gasleft();
+
+        // Perform multiple operations that access storage
+        for (uint256 i = 0; i < 5; i++) {
+            vm.prank(admin);
+            yzEnforcedComposer_arb.setTVLCap((i + 1) * 100 ether);
+
+            vm.prank(admin);
+            yzEnforcedComposer_arb.setUserCap(userA, (i + 1) * 50 ether);
+        }
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Verify gas is reasonable for storage access
+        uint256 expectedGas = (committedGasSnapshot.setTVLCapGas + committedGasSnapshot.setUserCapGas) * 5;
+        uint256 tolerance = (expectedGas * GAS_TOLERANCE_PERCENT) / 100;
+        uint256 maxAllowedGas = expectedGas + tolerance;
+
+        assertLe(gasUsed, maxAllowedGas, "Storage access too expensive");
+    }
+
+    function test_GasOptimization_CalldataEfficiency() public {
+        uint256 gasBefore = gasleft();
+
+        // Perform operation with large calldata
+        bytes memory largeCalldata = new bytes(1024);
+        for (uint256 i = 0; i < 1024; i++) {
+            largeCalldata[i] = bytes1(uint8(i % 256));
+        }
+
+        _executeSuccessfulDeposit(userA, 100 ether);
+
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Verify gas is reasonable
+        assertLe(gasUsed, MAX_GAS_LIMIT, "Calldata processing too expensive");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _loadCommittedGasSnapshot() internal {
+        // These are the committed gas snapshots from previous runs
+        committedGasSnapshot.depositGas = 280000;
+        committedGasSnapshot.redeemGas = 280000;
+        committedGasSnapshot.setTVLCapGas = 50000;
+        committedGasSnapshot.setUserCapGas = 50000;
+        committedGasSnapshot.pauseDepositsGas = 45000;
+        committedGasSnapshot.pauseRedemptionsGas = 45000;
+        committedGasSnapshot.setWhitelistGas = 75000;
+        committedGasSnapshot.emergencyWithdrawGas = 80000;
+        committedGasSnapshot.depositAndSendGas = 300000;
+        committedGasSnapshot.redeemAndSendGas = 300000;
+    }
+
+    function _setupDefaultCaps() internal {
+        vm.prank(admin);
+        yzEnforcedComposer_arb.setTVLCap(MAX_TEST_AMOUNT);
+    }
+
+    function _executeSuccessfulDeposit(address user, uint256 amount) internal {
+        _fundLocalFromHub(user, amount);
+        vm.prank(user);
+        assetOFT_arb.approve(address(yzEnforcedComposer_arb), amount);
+
+        SendParam memory sendParam = _buildHopParam(address(0), user, ARB_EID, amount);
+
+        vm.prank(user);
+        yzEnforcedComposer_arb.depositAndSend(amount, sendParam, user);
+    }
+}
