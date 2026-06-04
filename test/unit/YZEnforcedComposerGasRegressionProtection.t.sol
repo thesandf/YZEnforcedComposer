@@ -285,9 +285,8 @@ contract YZEnforcedComposerGasRegressionProtection is YZEnforcedComposerBase {
 
         // Verify gas scaling is reasonable (should not scale linearly with amount)
         for (uint256 i = 1; i < gasUsed.length; i++) {
-            uint256 gasIncrease = gasUsed[i] > gasUsed[i - 1]
-                ? gasUsed[i] - gasUsed[i - 1]
-                : gasUsed[i - 1] - gasUsed[i];
+            uint256 gasIncrease =
+                gasUsed[i] > gasUsed[i - 1] ? gasUsed[i] - gasUsed[i - 1] : gasUsed[i - 1] - gasUsed[i];
 
             // Gas increase should not be proportional to amount increase
             // Allow some increase but not linear scaling in mock endpoint environment
