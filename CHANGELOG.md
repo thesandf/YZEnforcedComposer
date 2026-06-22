@@ -6,6 +6,14 @@ All notable changes to the YieldZero Enforced Composer repository will be docume
 
 ## [1.1.0] - 2026-05-18
 
+### Security Remediation
+
+#### Fixed
+* **F2: Share Tracking Desynchronization**: Replaced deposit tracking model with ownership-cap model. Cap checks now use live share balances.
+* **F3: TVL Accounting Mismatch**: Fixed asset/share unit inconsistency in redemption accounting. TVL invariants now remain valid after yield accrual.
+* **F5: Rate Limiter DoS**: Added authorized caller controls. Prevented arbitrary users from consuming another user's rate limit.
+
+
 ### Added
 * **Stateless Risk Library**: Added `src/libraries/EnforcementLib.sol` to isolate math, TVL caps, and user cap verification logic.
 * **Unified Custom Errors**: Added `src/interfaces/IYZErrors.sol` containing shared error mappings across all contracts.
