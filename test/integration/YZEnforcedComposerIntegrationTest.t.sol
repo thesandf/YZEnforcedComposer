@@ -87,7 +87,7 @@ contract YZEnforcedComposerIntegrationTest is YZEnforcedComposerBase {
         yzEnforcedComposer_arb.depositAndSend(200 ether, depositParam, userA);
 
         assertEq(vault_arb.totalAssets(), 200 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 200 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 200 ether);
 
         // 2. User redeems half
         vm.prank(userA);
@@ -99,7 +99,7 @@ contract YZEnforcedComposerIntegrationTest is YZEnforcedComposerBase {
         yzEnforcedComposer_arb.redeemAndSend(100 ether, redeemParam, userA);
 
         assertEq(vault_arb.totalAssets(), 100 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 100 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 100 ether);
 
         // 3. User deposits again
         _fundLocalFromHub(userA, 50 ether);
@@ -112,7 +112,7 @@ contract YZEnforcedComposerIntegrationTest is YZEnforcedComposerBase {
         yzEnforcedComposer_arb.depositAndSend(50 ether, depositParam, userA);
 
         assertEq(vault_arb.totalAssets(), 150 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 150 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 150 ether);
     }
 
     function test_FullUserFlow_MultipleUsers() public {
@@ -140,8 +140,8 @@ contract YZEnforcedComposerIntegrationTest is YZEnforcedComposerBase {
         yzEnforcedComposer_arb.depositAndSend(200 ether, paramB, userB);
 
         // Verify both tracked correctly
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 100 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userB), 200 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 100 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userB), 200 ether);
         assertEq(vault_arb.totalAssets(), 300 ether);
     }
 

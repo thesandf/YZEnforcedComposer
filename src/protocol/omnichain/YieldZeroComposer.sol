@@ -152,7 +152,6 @@ contract YieldZeroComposer is VaultComposerSync, Ownable {
         if (_shareAmount > maxDepositSize) revert YZComposer_AboveMaximum();
         if (_refundAddress == address(0)) revert YZComposer_ZeroAddress();
         if (_sendParam.dstEid == 0) revert YZComposer_InvalidDestination();
-        if (_shareAmount > totalValueLocked) revert YZComposer_InsufficientTVL();
 
         // Check rate limiting if rate limiter is set
         if (rateLimiter != address(0)) {
@@ -169,7 +168,11 @@ contract YieldZeroComposer is VaultComposerSync, Ownable {
         // Transfer shares from user to composer
         IERC20(SHARE_ERC20).safeTransferFrom(msg.sender, address(this), _shareAmount);
 
-        totalValueLocked -= _shareAmount;
+        if (expectedAssets > totalValueLocked) {
+            totalValueLocked = 0;
+        } else {
+            totalValueLocked -= expectedAssets;
+        }
 
         _redeemAndSend(
             OFTComposeMsgCodec.addressToBytes32(msg.sender), _shareAmount, _sendParam, _refundAddress, msg.value
@@ -182,7 +185,7 @@ contract YieldZeroComposer is VaultComposerSync, Ownable {
             RateLimiter(rateLimiter).recordOperation(msg.sender);
         }
 
-        emit TVLUpdated(totalValueLocked, msg.sender, _shareAmount, false);
+        emit TVLUpdated(totalValueLocked, msg.sender, expectedAssets, false);
         emit UserRedeemRecorded(msg.sender, _shareAmount, _sendParam.dstEid);
     }
 

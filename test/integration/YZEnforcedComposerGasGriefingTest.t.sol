@@ -47,7 +47,7 @@ contract YZEnforcedComposerGasGriefingTest is YZEnforcedComposerBase {
 
         // Verify contract state unchanged
         assertEq(vault_arb.totalAssets(), 25 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userB), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userB), 0);
     }
 
     function test_GasGriefing_RevertHandling_NotVulnerable() public {
@@ -118,7 +118,7 @@ contract YZEnforcedComposerGasGriefingTest is YZEnforcedComposerBase {
 
         // Verify contract state unchanged
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
     }
 
     function test_GasGriefing_UserCapRevert_NotVulnerable() public {
@@ -126,33 +126,32 @@ contract YZEnforcedComposerGasGriefingTest is YZEnforcedComposerBase {
         vm.prank(admin);
         yzEnforcedComposer_arb.setUserCap(userA, 1 ether);
 
-        // User deposits to cap
+        // User deposits to cap locally on ARB
         _fundLocalFromHub(userA, 1 ether);
-        vm.prank(userA);
+        vm.startPrank(userA);
         assetOFT_arb.approve(address(yzEnforcedComposer_arb), 1 ether);
 
-        SendParam memory sendParam = _buildHopParam(address(0), userA, ETH_EID, 1 ether);
+        SendParam memory sendParam = _buildHopParam(address(0), userA, ARB_EID, 1 ether);
 
-        uint256 fee = _getAndFundDepositFee(userA, sendParam);
-        vm.prank(userA);
-        yzEnforcedComposer_arb.depositAndSend{value: fee}(1 ether, sendParam, userA);
+        yzEnforcedComposer_arb.depositAndSend{value: 0}(1 ether, sendParam, userA);
+        vm.stopPrank();
 
         // Try to grief with multiple small reverts
+        // User A's shares are naturally held locally on ARB chain, no deal hack needed
         for (uint256 i = 0; i < 10; i++) {
             _fundLocalFromHub(userA, 0.1 ether);
-            vm.prank(userA);
+            vm.startPrank(userA);
             assetOFT_arb.approve(address(yzEnforcedComposer_arb), 0.1 ether);
 
-            sendParam = _buildHopParam(address(0), userA, ETH_EID, 0.1 ether);
+            sendParam = _buildHopParam(address(0), userA, ARB_EID, 0.1 ether);
 
-            uint256 loopFee = _getAndFundDepositFee(userA, sendParam);
-            vm.prank(userA);
             vm.expectRevert();
-            yzEnforcedComposer_arb.depositAndSend{value: loopFee}(0.1 ether, sendParam, userA);
+            yzEnforcedComposer_arb.depositAndSend{value: 0}(0.1 ether, sendParam, userA);
+            vm.stopPrank();
         }
 
         // Verify contract remains functional and state consistent
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 1 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 1 ether);
         assertEq(vault_arb.totalAssets(), 1 ether);
     }
 
@@ -400,9 +399,10 @@ contract YZEnforcedComposerGasGriefingTest is YZEnforcedComposerBase {
         }
 
         // Verify state consistency after all reverts
+        verifyPackets(ETH_EID, address(shareOFT_eth));
         assertEq(vault_arb.totalAssets(), 90 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 50 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userB), 40 ether);
+        assertEq(shareOFT_eth.balanceOf(userA), 50 ether);
+        assertEq(shareOFT_eth.balanceOf(userB), 40 ether);
 
         // Contract should remain fully functional
         _fundLocalFromHub(userC, 10 ether);
@@ -415,8 +415,9 @@ contract YZEnforcedComposerGasGriefingTest is YZEnforcedComposerBase {
         vm.prank(userC);
         yzEnforcedComposer_arb.depositAndSend{value: feeC}(10 ether, sendParam, userC);
 
+        verifyPackets(ETH_EID, address(shareOFT_eth));
         assertEq(vault_arb.totalAssets(), 100 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userC), 10 ether);
+        assertEq(shareOFT_eth.balanceOf(userC), 10 ether);
     }
 }
 

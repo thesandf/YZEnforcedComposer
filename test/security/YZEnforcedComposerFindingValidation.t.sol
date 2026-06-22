@@ -120,11 +120,11 @@ contract MockVaultForLowDecimals is MockERC20WithDecimals {
         asset = _asset;
     }
 
-    function totalAssets() external view returns (uint256) {
+    function totalAssets() external pure returns (uint256) {
         return 0;
     }
 
-    function convertToAssets(uint256) external view returns (uint256) {
+    function convertToAssets(uint256) external pure returns (uint256) {
         return 0;
     }
 
@@ -232,7 +232,7 @@ contract YZEnforcedComposerFindingValidation is YZEnforcedComposerBase {
 
         // Assert TVL before execution
         uint256 tvlBefore = vault_arb.totalAssets();
-        uint256 trackedDepositsBefore = yzEnforcedComposer_arb.userDeposits(userA);
+        uint256 trackedDepositsBefore = yzEnforcedComposer_arb.getUserShares(userA);
         assertEq(tvlBefore, 0);
         assertEq(trackedDepositsBefore, 0);
 
@@ -249,7 +249,7 @@ contract YZEnforcedComposerFindingValidation is YZEnforcedComposerBase {
 
         // Assert that deposit was blocked and refunded (TVL and tracked deposits remain 0)
         uint256 tvlAfter = vault_arb.totalAssets();
-        uint256 trackedDepositsAfter = yzEnforcedComposer_arb.userDeposits(userA);
+        uint256 trackedDepositsAfter = yzEnforcedComposer_arb.getUserShares(userA);
         assertEq(tvlAfter, tvlBefore);
         assertEq(tvlAfter, 0);
         assertEq(trackedDepositsAfter, 0);
@@ -348,9 +348,9 @@ contract YZEnforcedComposerFindingValidation is YZEnforcedComposerBase {
         assertEq(messageHash, keccak256(expectedComposeMsg), "Compose message not registered in endpoint");
 
         uint256 tvlBefore = vault_arb.totalAssets();
-        uint256 trackedDepositsBefore = yzEnforcedComposer_arb.userDeposits(userA);
+        uint256 trackedDepositsBefore = yzEnforcedComposer_arb.getUserShares(userA);
         assertEq(tvlBefore, 10 ether);
-        assertEq(trackedDepositsBefore, 10 ether);
+        assertEq(trackedDepositsBefore, 0);
 
         // Expect Refunded event from parent
         vm.expectEmit(true, true, true, true, address(yzEnforcedComposer_arb));
@@ -363,12 +363,16 @@ contract YZEnforcedComposerFindingValidation is YZEnforcedComposerBase {
             address(shareOFT_arb), guid, expectedComposeMsg, address(this), ""
         );
 
+        // Process the refund packets returning to ETH
+        verifyPackets(ETH_EID, address(shareOFT_eth));
+
         // Assert that redemption was blocked and refunded (TVL and tracked deposits remain unchanged)
         uint256 tvlAfter = vault_arb.totalAssets();
-        uint256 trackedDepositsAfter = yzEnforcedComposer_arb.userDeposits(userA);
+        uint256 trackedDepositsAfter = yzEnforcedComposer_arb.getUserShares(userA);
         assertEq(tvlAfter, tvlBefore);
         assertEq(tvlAfter, 10 ether);
-        assertEq(trackedDepositsAfter, 10 ether);
+        assertEq(trackedDepositsAfter, 0);
+        assertEq(shareOFT_eth.balanceOf(userA), 10 ether);
     }
 
     // =========================================================================
@@ -448,7 +452,7 @@ contract YZEnforcedComposerFindingValidation is YZEnforcedComposerBase {
         assertEq(messageHash, keccak256(expectedComposeMsg), "Compose message not registered in endpoint");
 
         uint256 tvlBefore = vault_arb.totalAssets();
-        uint256 trackedDepositsBefore = yzEnforcedComposer_arb.userDeposits(userA);
+        uint256 trackedDepositsBefore = yzEnforcedComposer_arb.getUserShares(userA);
         assertEq(tvlBefore, 0);
         assertEq(trackedDepositsBefore, 0);
 
@@ -463,9 +467,9 @@ contract YZEnforcedComposerFindingValidation is YZEnforcedComposerBase {
             address(assetOFT_arb), guid, expectedComposeMsg, address(this), ""
         );
 
-        // Assert that deposit was blocked and refunded (TVL and tracked deposits remain 0)
+        // Assert that deposit was blocked and refunded (TVL remains 0)
         uint256 tvlAfter = vault_arb.totalAssets();
-        uint256 trackedDepositsAfter = yzEnforcedComposer_arb.userDeposits(userA);
+        uint256 trackedDepositsAfter = yzEnforcedComposer_arb.getUserShares(userA);
         assertEq(tvlAfter, tvlBefore);
         assertEq(tvlAfter, 0);
         assertEq(trackedDepositsAfter, 0);
@@ -613,7 +617,7 @@ contract YZEnforcedComposerFindingValidation is YZEnforcedComposerBase {
     // =========================================================================
 
     function test_DepositCapAccountingIgnoresShareTransfers() external {
-        // CONFIRMED: transferring shares does not clear composer deposit tracking
+        // Under the Maximum Ownership Cap model, transferring shares frees up the user's cap
         vm.prank(admin);
         yzEnforcedComposer_arb.setUserCap(userA, 50 ether);
 
@@ -624,7 +628,7 @@ contract YZEnforcedComposerFindingValidation is YZEnforcedComposerBase {
         vm.prank(userA);
         yzEnforcedComposer_arb.depositAndSend(30 ether, depParam, userA);
 
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 30 ether);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userA), 30 ether);
 
         // User A transfers all vault shares to User B
         uint256 userAShareBalance = vault_arb.balanceOf(userA);
@@ -633,7 +637,7 @@ contract YZEnforcedComposerFindingValidation is YZEnforcedComposerBase {
 
         assertEq(vault_arb.balanceOf(userA), 0);
 
-        // composer still tracks User A's deposits as 30 ether
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 30 ether, "Cap was not freed!");
+        // Under the new model, User A's cap is successfully freed (ownership = 0)
+        assertEq(yzEnforcedComposer_arb.getUserShares(userA), 0, "Cap was not freed!");
     }
 }

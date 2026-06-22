@@ -97,7 +97,7 @@ contract YZEnforcedComposerFormalInvariants is YZEnforcedComposerBase {
         // Test user caps
         address[] memory users = _getTestUsers();
         for (uint256 i = 0; i < users.length; i++) {
-            uint256 userDeposit = yzEnforcedComposer_arb.userDeposits(users[i]);
+            uint256 userDeposit = yzEnforcedComposer_arb.getUserAssets(users[i]);
             uint256 userCap = yzEnforcedComposer_arb.userDepositCap(users[i]);
 
             if (userCap > 0) {
@@ -188,7 +188,7 @@ contract YZEnforcedComposerFormalInvariants is YZEnforcedComposerBase {
         uint256 initialAssets = vault_arb.totalAssets();
         uint256 initialShares = vault_arb.totalSupply();
         uint256 initialUserShares = vault_arb.balanceOf(userA);
-        uint256 initialUserDeposits = yzEnforcedComposer_arb.userDeposits(userA);
+        uint256 initialUserDeposits = yzEnforcedComposer_arb.getUserAssets(userA);
 
         // Mock failure scenario
         _mockAtomicFailure();
@@ -208,7 +208,7 @@ contract YZEnforcedComposerFormalInvariants is YZEnforcedComposerBase {
         assertEq(vault_arb.totalAssets(), initialAssets, "Assets not rolled back");
         assertEq(vault_arb.totalSupply(), initialShares, "Shares not rolled back");
         assertEq(vault_arb.balanceOf(userA), initialUserShares, "User shares not rolled back");
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), initialUserDeposits, "User deposits not rolled back");
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), initialUserDeposits, "User deposits not rolled back");
     }
 
     function test_StorageAtomicity_ShareMintRollback() public {

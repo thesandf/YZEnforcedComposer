@@ -81,7 +81,7 @@ contract YZEnforcedComposerUserCapTest is YZEnforcedComposerBase {
         yzEnforcedComposer_arb.depositAndSend(50 ether, sendParam, userA);
 
         assertEq(vault_arb.totalAssets(), 50 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 50 ether);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userA), 50 ether);
     }
 
     function test_Deposit_UpdatesUserTrackingAfterSuccess() public {
@@ -97,7 +97,7 @@ contract YZEnforcedComposerUserCapTest is YZEnforcedComposerBase {
         vm.prank(userA);
         yzEnforcedComposer_arb.depositAndSend(30 ether, sendParam, userA);
 
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 30 ether);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userA), 30 ether);
 
         _fundLocalFromHub(userA, 20 ether);
         vm.prank(userA);
@@ -108,7 +108,7 @@ contract YZEnforcedComposerUserCapTest is YZEnforcedComposerBase {
         vm.prank(userA);
         yzEnforcedComposer_arb.depositAndSend(20 ether, sendParam, userA);
 
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 50 ether);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userA), 50 ether);
     }
 
     function test_Deposit_DoesNotUpdateTrackingIfReverts() public {
@@ -125,7 +125,7 @@ contract YZEnforcedComposerUserCapTest is YZEnforcedComposerBase {
         vm.expectRevert();
         yzEnforcedComposer_arb.depositAndSend(50 ether, sendParam, userA);
 
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userA), 0);
     }
 
     function testFuzz_SetUserCap(address _user, uint256 _cap) public {
@@ -155,7 +155,7 @@ contract YZEnforcedComposerUserCapTest is YZEnforcedComposerBase {
         yzEnforcedComposer_arb.depositAndSend(_amount, sendParam, userA);
 
         if (_amount <= 50 ether) {
-            assertLe(yzEnforcedComposer_arb.userDeposits(userA), 50 ether);
+            assertLe(yzEnforcedComposer_arb.getUserShares(userA), 50 ether);
         }
     }
 }

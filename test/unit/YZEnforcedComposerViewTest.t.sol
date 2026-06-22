@@ -27,15 +27,15 @@ contract YZEnforcedComposerViewTest is YZEnforcedComposerBase {
         vm.prank(userA);
         yzEnforcedComposer_arb.depositAndSend(30 ether, sendParam, userA);
 
-        (uint256 deposit, uint256 cap, uint256 remaining) = yzEnforcedComposer_arb.getUserDepositInfo(userA);
+        (uint256 ownership, uint256 cap, uint256 remaining) = yzEnforcedComposer_arb.getUserCapUsage(userA);
 
-        assertEq(deposit, 30 ether);
+        assertEq(ownership, 30 ether);
         assertEq(cap, 100 ether);
         assertEq(remaining, 70 ether);
     }
 
     function test_GetUserDepositInfo_ZeroCap_ReturnsMaxRemaining() public view {
-        (,, uint256 remaining) = yzEnforcedComposer_arb.getUserDepositInfo(userA);
+        (,, uint256 remaining) = yzEnforcedComposer_arb.getUserCapUsage(userA);
         assertEq(remaining, type(uint256).max);
     }
 

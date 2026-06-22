@@ -81,11 +81,7 @@ contract YZEnforcedComposer is VaultComposerSync {
     /// @notice Per-user deposit cap (0 = unlimited)
     mapping(address => uint256) public userDepositCap;
 
-    /// @notice Track user deposits for cap enforcement
-    mapping(address => uint256) public userDeposits;
 
-    /// @notice Track user shares for cap enforcement (shares are exact, no yield drift)
-    mapping(address => uint256) public userShares;
 
     /// @notice Deposits paused state
     bool public depositsPaused;
@@ -116,7 +112,7 @@ contract YZEnforcedComposer is VaultComposerSync {
     event AdminProposed(address indexed newAdmin);
     event EmergencyWithdrawNative(address indexed to, uint256 amount);
     event EnforcementExecuted(address indexed user, uint256 assets, uint256 tvlBefore, uint256 tvlAfter);
-    event UserDepositTrackingReset(address indexed user, uint256 previousDeposit, uint256 redemptionAmount);
+
 
     // ======== Constructor ========
 
@@ -234,9 +230,12 @@ contract YZEnforcedComposer is VaultComposerSync {
         }
 
         // ====== 3: Enforce User Deposit Cap ======
+        // Enforces "Maximum Ownership" (total vault shares held by the user across the system).
+        // Since shares are standard ERC20 tokens and can be transferred, checking the real-time
+        // balance of the user ensures we enforce the cap based on the user's actual current holdings.
         if (userDepositCap[depositorAddr] > 0) {
             uint256 expectedShares = VAULT.previewDeposit(_assetAmount);
-            uint256 currentShares = userShares[depositorAddr];
+            uint256 currentShares = IERC20(SHARE_ERC20).balanceOf(depositorAddr);
             uint256 totalShares = currentShares + expectedShares;
             uint256 totalAssetsEquivalent = VAULT.convertToAssets(totalShares);
             if (totalAssetsEquivalent > userDepositCap[depositorAddr]) {
@@ -266,12 +265,9 @@ contract YZEnforcedComposer is VaultComposerSync {
         // Update with actual TVL increase (may differ due to vault rounding, strategy yield, etc.)
         uint256 tvlAfter = VAULT.totalAssets();
         uint256 actualTvlIncrease = tvlAfter > tvlBefore ? tvlAfter - tvlBefore : _assetAmount;
-        userDeposits[depositorAddr] += actualTvlIncrease;
 
-        // Track actual shares minted in the vault (retrieved from overridden _deposit call)
-        uint256 actualSharesMinted = _tempSharesMinted;
-        delete _tempSharesMinted; // Reset temporary storage
-        userShares[depositorAddr] += actualSharesMinted;
+        // Reset temporary storage
+        delete _tempSharesMinted;
 
         emit EnforcementExecuted(depositorAddr, actualTvlIncrease, tvlBefore, tvlAfter);
     }
@@ -316,8 +312,8 @@ contract YZEnforcedComposer is VaultComposerSync {
         address _refundAddress,
         uint256 _msgValue
     ) internal virtual override {
-        // Convert bytes32 to address
-        address redeemerAddr = _redeemer.bytes32ToAddress();
+        // Convert bytes32 to address (unused but documented for clarity if needed later)
+        // address redeemerAddr = _redeemer.bytes32ToAddress();
 
         // ====== 1: Enforce Pause Control ======
         if (redemptionsPaused) revert YZ_RedemptionsPaused();
@@ -355,22 +351,7 @@ contract YZEnforcedComposer is VaultComposerSync {
         _sendParam.amountLD = truncatedAssetAmount;
         _sendParam.minAmountLD = 0;
 
-        // ====== 8: Update tracking BEFORE send (assets about to leave) ======
-        // Decrement user's shares first
-        if (userShares[redeemerAddr] >= _shareAmount) {
-            userShares[redeemerAddr] -= _shareAmount;
-        } else {
-            userShares[redeemerAddr] = 0;
-        }
 
-        // Underflow protection: if user received more assets than tracked (due to yield),
-        // reset to 0 and emit tracking reset event for monitoring
-        if (userDeposits[redeemerAddr] >= assetAmountReceived) {
-            userDeposits[redeemerAddr] -= assetAmountReceived;
-        } else {
-            emit UserDepositTrackingReset(redeemerAddr, userDeposits[redeemerAddr], assetAmountReceived);
-            userDeposits[redeemerAddr] = 0;
-        }
 
         // ====== 9: Send assets cross-chain ======
         _send(ASSET_OFT, _sendParam, _refundAddress, _msgValue);
@@ -560,6 +541,16 @@ contract YZEnforcedComposer is VaultComposerSync {
     }
 
     /**
+     * @notice Backward-compatible view function for userShares mapping
+     * @dev Signature compatible with public userShares mapping getter
+     * @param _user User address
+     * @return uint256 Shares balance
+     */
+    function userShares(address _user) external view returns (uint256) {
+        return IERC20(SHARE_ERC20).balanceOf(_user);
+    }
+
+    /**
      * @notice Get user's assets value
      * @param _user User address
      * @return uint256 Assets value
@@ -576,11 +567,19 @@ contract YZEnforcedComposer is VaultComposerSync {
      * @return cap User's deposit cap
      * @return remaining Remaining capacity
      */
-    function getUserDepositInfo(address _user) external view returns (uint256 deposit, uint256 cap, uint256 remaining) {
-        deposit = userDeposits[_user];
+    /**
+     * @notice Get user's current cap usage (asset equivalent of vault shares owned)
+     * @param _user User address
+     * @return ownership Current asset value of shares owned
+     * @return cap User's deposit cap
+     * @return remaining Remaining capacity under the cap
+     */
+    function getUserCapUsage(address _user) external view returns (uint256 ownership, uint256 cap, uint256 remaining) {
+        uint256 shareBalance = IERC20(SHARE_ERC20).balanceOf(_user);
+        ownership = VAULT.convertToAssets(shareBalance);
         cap = userDepositCap[_user];
         if (cap > 0) {
-            remaining = cap > deposit ? cap - deposit : 0;
+            remaining = cap > ownership ? cap - ownership : 0;
         } else {
             remaining = type(uint256).max;
         }
@@ -609,7 +608,7 @@ contract YZEnforcedComposer is VaultComposerSync {
 
         if (userDepositCap[_user] > 0) {
             uint256 expectedShares = VAULT.previewDeposit(_amount);
-            uint256 currentShares = userShares[_user];
+            uint256 currentShares = IERC20(SHARE_ERC20).balanceOf(_user);
             uint256 totalShares = currentShares + expectedShares;
             uint256 totalAssetsEquivalent = VAULT.convertToAssets(totalShares);
             if (totalAssetsEquivalent > userDepositCap[_user]) {

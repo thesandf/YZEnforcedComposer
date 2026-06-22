@@ -106,8 +106,8 @@ contract YZEnforcedComposerFuzzTest is YZEnforcedComposerBase {
         _assertDepositSuccess(userB, _userBDeposit, _userADeposit + _userBDeposit);
 
         // Verify caps not exceeded
-        assertLe(yzEnforcedComposer_arb.userDeposits(userA), _userACap);
-        assertLe(yzEnforcedComposer_arb.userDeposits(userB), _userBCap);
+        assertLe(yzEnforcedComposer_arb.getUserAssets(userA), _userACap);
+        assertLe(yzEnforcedComposer_arb.getUserAssets(userB), _userBCap);
         assertLe(vault_arb.totalAssets(), _tvlCap);
     }
 
@@ -122,7 +122,7 @@ contract YZEnforcedComposerFuzzTest is YZEnforcedComposerBase {
         _assertDepositSuccess(userA, _cap, _cap);
 
         // Verify exactly at cap
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), _cap);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), _cap);
         assertEq(vault_arb.totalAssets(), _cap);
     }
 
@@ -147,7 +147,7 @@ contract YZEnforcedComposerFuzzTest is YZEnforcedComposerBase {
         _assertNoStateChange();
     }
 
-    function testFuzz_Deposit_ZeroAmountAlwaysReverts(uint256 _unused) public {
+    function testFuzz_Deposit_ZeroAmountAlwaysReverts(uint256 /*_unused*/) public {
         // This test ensures zero amount always reverts regardless of other parameters
         uint256 depositAmount = 0;
         _fundLocalFromHub(userA, depositAmount);
@@ -184,7 +184,7 @@ contract YZEnforcedComposerFuzzTest is YZEnforcedComposerBase {
         _executeSuccessfulRedeem(userA, _initialDeposit);
 
         _assertRedeemSuccess(userA, _initialDeposit, _initialDeposit);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
     }
 
     function testFuzz_Redeem_RevertsWhenInsufficientShares(uint256 _redeemAmount) public {
@@ -350,7 +350,7 @@ contract YZEnforcedComposerFuzzTest is YZEnforcedComposerBase {
         assertEq(yzEnforcedComposer_arb.admin(), _newAdmin);
     }
 
-    function testFuzz_SetAdmin_RevertsOnZeroAddress(uint256 _unused) public {
+    function testFuzz_SetAdmin_RevertsOnZeroAddress(uint256 /*_unused*/) public {
         vm.expectRevert(YZEnforcedComposer.YZ_ZeroAddress.selector);
         vm.prank(admin);
         yzEnforcedComposer_arb.setAdmin(address(0));
@@ -369,16 +369,16 @@ contract YZEnforcedComposerFuzzTest is YZEnforcedComposerBase {
                             VIEW FUNCTION FUZZ TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testFuzz_GetUserDepositInfo_ConsistentWithDeposits(uint256 _userCap, uint256 _depositAmount) public {
+    function testFuzz_GetUserCapUsage_ConsistentWithDeposits(uint256 _userCap, uint256 _depositAmount) public {
         _userCap = bound(_userCap, MIN_CAP, MAX_FUZZ_AMOUNT);
         _depositAmount = bound(_depositAmount, MIN_FUZZ_AMOUNT, _userCap);
 
         _setupUserCap(userA, _userCap);
         _executeSuccessfulDeposit(userA, _depositAmount);
 
-        (uint256 deposit, uint256 cap, uint256 remaining) = yzEnforcedComposer_arb.getUserDepositInfo(userA);
+        (uint256 ownership, uint256 cap, uint256 remaining) = yzEnforcedComposer_arb.getUserCapUsage(userA);
 
-        assertEq(deposit, _depositAmount);
+        assertEq(ownership, _depositAmount);
         assertEq(cap, _userCap);
         assertEq(remaining, _userCap - _depositAmount);
     }
@@ -440,7 +440,7 @@ contract YZEnforcedComposerFuzzTest is YZEnforcedComposerBase {
         yzEnforcedComposer_arb.emergencyWithdraw(_withdrawAmount, address(0));
     }
 
-    function testFuzz_EmergencyWithdraw_Assets_RevertsOnZeroAmount(uint256 _unused) public {
+    function testFuzz_EmergencyWithdraw_Assets_RevertsOnZeroAmount(uint256 /*_unused*/) public {
         vm.expectRevert(YZEnforcedComposer.YZ_ZeroAmount.selector);
         vm.prank(admin);
         yzEnforcedComposer_arb.emergencyWithdraw(0, recipient);
@@ -505,18 +505,18 @@ contract YZEnforcedComposerFuzzTest is YZEnforcedComposerBase {
         yzEnforcedComposer_arb.redeemAndSend(amount, redeemParam, user);
     }
 
-    function _assertDepositSuccess(address user, uint256 depositAmount, uint256 expectedTVLIncrease) internal {
+    function _assertDepositSuccess(address user, uint256 depositAmount, uint256 expectedTVLIncrease) internal view {
         assertEq(vault_arb.totalAssets(), expectedTVLIncrease);
-        assertEq(yzEnforcedComposer_arb.userDeposits(user), depositAmount);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(user), depositAmount);
     }
 
-    function _assertRedeemSuccess(address user, uint256 initialDeposit, uint256 redeemAmount) internal {
+    function _assertRedeemSuccess(address user, uint256 initialDeposit, uint256 redeemAmount) internal view {
         uint256 expectedRemaining = initialDeposit - redeemAmount;
-        assertEq(yzEnforcedComposer_arb.userDeposits(user), expectedRemaining);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(user), expectedRemaining);
     }
 
-    function _assertNoStateChange() internal {
+    function _assertNoStateChange() internal view {
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
     }
 }

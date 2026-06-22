@@ -170,7 +170,7 @@ contract YZEnforcedComposerMaliciousERC20Test is YZEnforcedComposerBase {
         // Verify no state change
         IERC4626 vault = composer.VAULT();
         assertEq(vault.totalAssets(), 0);
-        assertEq(composer.userDeposits(userA), 0);
+        assertEq(composer.getUserAssets(userA), 0);
         assertEq(revertToken.balanceOf(userA), TEST_AMOUNT); // Token not transferred
     }
 
@@ -198,7 +198,7 @@ contract YZEnforcedComposerMaliciousERC20Test is YZEnforcedComposerBase {
         // Verify no state change
         IERC4626 vault = composer.VAULT();
         assertEq(vault.totalAssets(), 0);
-        assertEq(composer.userDeposits(userA), 0);
+        assertEq(composer.getUserAssets(userA), 0);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -229,7 +229,7 @@ contract YZEnforcedComposerMaliciousERC20Test is YZEnforcedComposerBase {
         // Verify successful deposit despite callback
         IERC4626 vault = composer.VAULT();
         assertGt(vault.totalAssets(), 0);
-        assertGt(composer.userDeposits(userA), 0);
+        assertGt(composer.getUserAssets(userA), 0);
     }
 
     function test_CallbackToken_StateConsistency() public {
@@ -255,7 +255,7 @@ contract YZEnforcedComposerMaliciousERC20Test is YZEnforcedComposerBase {
         // Verify state is consistent
         IERC4626 vault = composer.VAULT();
         assertGt(vault.totalAssets(), 0);
-        assertGt(composer.userDeposits(userA), 0);
+        assertGt(composer.getUserAssets(userA), 0);
 
         // Verify callback didn't break internal state
         assertEq(composer.tvlCap(), MAX_TEST_AMOUNT);
@@ -284,7 +284,7 @@ contract YZEnforcedComposerMaliciousERC20Test is YZEnforcedComposerBase {
         // Verify successful deposit
         IERC4626 vault = composer.VAULT();
         assertGt(vault.totalAssets(), 0);
-        assertGt(composer.userDeposits(userA), 0);
+        assertGt(composer.getUserAssets(userA), 0);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -314,7 +314,7 @@ contract YZEnforcedComposerMaliciousERC20Test is YZEnforcedComposerBase {
         // Verify successful deposit
         IERC4626 vault = composer.VAULT();
         assertGt(vault.totalAssets(), 0);
-        assertGt(composer.userDeposits(userA), 0);
+        assertGt(composer.getUserAssets(userA), 0);
     }
 
     function test_ERC777Callback_Operations() public {
@@ -340,7 +340,7 @@ contract YZEnforcedComposerMaliciousERC20Test is YZEnforcedComposerBase {
         // Verify successful deposit
         IERC4626 vault = composer.VAULT();
         assertGt(vault.totalAssets(), 0);
-        assertGt(composer.userDeposits(userA), 0);
+        assertGt(composer.getUserAssets(userA), 0);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -371,7 +371,7 @@ contract YZEnforcedComposerMaliciousERC20Test is YZEnforcedComposerBase {
         // Verify no state change
         IERC4626 vault = composer.VAULT();
         assertEq(vault.totalAssets(), 0);
-        assertEq(composer.userDeposits(userA), 0);
+        assertEq(composer.getUserAssets(userA), 0);
     }
 
     function test_EdgeCaseToken_ZeroTransfer() public {
@@ -398,7 +398,7 @@ contract YZEnforcedComposerMaliciousERC20Test is YZEnforcedComposerBase {
         // Verify no state change
         IERC4626 vault = composer.VAULT();
         assertEq(vault.totalAssets(), 0);
-        assertEq(composer.userDeposits(userA), 0);
+        assertEq(composer.getUserAssets(userA), 0);
     }
 
     function test_EdgeCaseToken_BalanceManipulation() public {
@@ -424,7 +424,7 @@ contract YZEnforcedComposerMaliciousERC20Test is YZEnforcedComposerBase {
         // Verify correct amount received
         IERC4626 vault = composer.VAULT();
         assertGt(vault.totalAssets(), 0);
-        assertGt(composer.userDeposits(userA), 0);
+        assertGt(composer.getUserAssets(userA), 0);
     }
 
     /*//////////////////////////////////////////////////////////////

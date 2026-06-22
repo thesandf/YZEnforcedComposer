@@ -206,7 +206,7 @@ contract YZEnforcedComposerCryptographicInvariants is YZEnforcedComposerBase {
         address[] memory users = _getTestUsers();
         for (uint256 i = 0; i < users.length; i++) {
             uint256 userCap = yzEnforcedComposer_arb.userDepositCap(users[i]);
-            uint256 userDeposit = yzEnforcedComposer_arb.userDeposits(users[i]);
+            uint256 userDeposit = yzEnforcedComposer_arb.getUserAssets(users[i]);
 
             if (userCap > 0) {
                 if (userDeposit > userCap) {

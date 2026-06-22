@@ -52,7 +52,7 @@ contract YZEnforcedComposerInvariants is YZEnforcedComposerBase {
         address[] memory users = _getAllTestUsers();
 
         for (uint256 i = 0; i < users.length; i++) {
-            uint256 userDeposit = yzEnforcedComposer_arb.userDeposits(users[i]);
+            uint256 userDeposit = yzEnforcedComposer_arb.getUserAssets(users[i]);
             uint256 userCap = yzEnforcedComposer_arb.userDepositCap(users[i]);
 
             // If cap is 0, it means unlimited
@@ -70,7 +70,7 @@ contract YZEnforcedComposerInvariants is YZEnforcedComposerBase {
         uint256 totalUserDeposits = 0;
 
         for (uint256 i = 0; i < users.length; i++) {
-            totalUserDeposits += yzEnforcedComposer_arb.userDeposits(users[i]);
+            totalUserDeposits += yzEnforcedComposer_arb.getUserAssets(users[i]);
         }
 
         uint256 actualTVL = vault_arb.totalAssets();
@@ -297,13 +297,13 @@ contract YZEnforcedComposerInvariants is YZEnforcedComposerBase {
         // getTotalValueLocked should match vault totalAssets
         assertEq(yzEnforcedComposer_arb.getTotalValueLocked(), vault_arb.totalAssets());
 
-        // getUserDepositInfo should be consistent
-        (uint256 deposit, uint256 cap, uint256 remaining) = yzEnforcedComposer_arb.getUserDepositInfo(testUser);
-        assertEq(deposit, yzEnforcedComposer_arb.userDeposits(testUser));
+        // getUserCapUsage should be consistent
+        (uint256 deposit, uint256 cap, uint256 remaining) = yzEnforcedComposer_arb.getUserCapUsage(testUser);
+        assertEq(deposit, yzEnforcedComposer_arb.getUserAssets(testUser));
         assertEq(cap, yzEnforcedComposer_arb.userDepositCap(testUser));
-
+ 
         if (cap > 0) {
-            assertEq(remaining, cap - deposit);
+            assertEq(remaining, cap > deposit ? cap - deposit : 0);
         }
     }
 
@@ -367,11 +367,11 @@ contract YZEnforcedComposerInvariants is YZEnforcedComposerBase {
 
     function _assertDepositSuccess(address user, uint256 depositAmount, uint256 expectedTVLIncrease) internal {
         assertEq(vault_arb.totalAssets(), expectedTVLIncrease);
-        assertEq(yzEnforcedComposer_arb.userDeposits(user), depositAmount);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(user), depositAmount);
     }
 
     function _assertNoStateChange() internal {
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
     }
 }

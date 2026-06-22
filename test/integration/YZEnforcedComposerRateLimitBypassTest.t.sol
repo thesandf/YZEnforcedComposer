@@ -52,9 +52,10 @@ contract YZEnforcedComposerRateLimitBypassTest is YZEnforcedComposerBase {
         yzEnforcedComposer_arb.depositAndSend{value: fee}(50 ether, sendParam, controlledAddress2);
 
         // Verify caps still enforced per address
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 100 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(controlledAddress1), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(controlledAddress2), 0);
+        verifyPackets(ETH_EID, address(shareOFT_eth));
+        assertEq(shareOFT_eth.balanceOf(userA), 100 ether);
+        assertEq(shareOFT_eth.balanceOf(controlledAddress1), 0);
+        assertEq(shareOFT_eth.balanceOf(controlledAddress2), 0);
     }
 
     function test_RateLimitBypass_CrossChainBypass_NotVulnerable() public {
@@ -98,7 +99,7 @@ contract YZEnforcedComposerRateLimitBypassTest is YZEnforcedComposerBase {
 
         // Verify TVL cap enforced across all chains
         assertEq(vault_arb.totalAssets(), 90 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userC), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userC), 0);
     }
 
     function test_RateLimitBypass_WhitelistBypass_NotVulnerable() public {
@@ -147,8 +148,8 @@ contract YZEnforcedComposerRateLimitBypassTest is YZEnforcedComposerBase {
 
         // Verify whitelist enforced per address
         assertEq(vault_arb.totalAssets(), 50 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(nonWhitelisted1), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(nonWhitelisted2), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(nonWhitelisted1), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(nonWhitelisted2), 0);
     }
 
     function test_RateLimitBypass_PauseBypass_NotVulnerable() public {
@@ -191,7 +192,7 @@ contract YZEnforcedComposerRateLimitBypassTest is YZEnforcedComposerBase {
 
         // Verify pause enforced across all entry points
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
     }
 
     function test_RateLimitBypass_UserCapManipulation_NotVulnerable() public {
@@ -199,16 +200,13 @@ contract YZEnforcedComposerRateLimitBypassTest is YZEnforcedComposerBase {
         vm.prank(admin);
         yzEnforcedComposer_arb.setUserCap(userA, 100 ether);
 
-        // User deposits to cap
+        // User deposits to cap locally on ARB
         _fundLocalFromHub(userA, 100 ether);
-        vm.prank(userA);
+        vm.startPrank(userA);
         assetOFT_arb.approve(address(yzEnforcedComposer_arb), 100 ether);
-
-        SendParam memory sendParam = _buildHopParam(address(0), userA, ETH_EID, 100 ether);
-        uint256 fee = _getAndFundDepositFee(userA, sendParam);
-
-        vm.prank(userA);
-        yzEnforcedComposer_arb.depositAndSend{value: fee}(100 ether, sendParam, userA);
+        SendParam memory sendParam = _buildHopParam(address(0), userA, ARB_EID, 100 ether);
+        yzEnforcedComposer_arb.depositAndSend{value: 0}(100 ether, sendParam, userA);
+        vm.stopPrank();
 
         // Try to manipulate user cap through admin functions
         vm.prank(userA);
@@ -222,19 +220,16 @@ contract YZEnforcedComposerRateLimitBypassTest is YZEnforcedComposerBase {
 
         // Try to deposit more - should still be rejected
         _fundLocalFromHub(userA, 50 ether);
-        vm.prank(userA);
+        vm.startPrank(userA);
         assetOFT_arb.approve(address(yzEnforcedComposer_arb), 50 ether);
-
-        sendParam = _buildHopParam(address(0), userA, ETH_EID, 50 ether);
-        fee = _getAndFundDepositFee(userA, sendParam);
-
-        vm.prank(userA);
+        sendParam = _buildHopParam(address(0), userA, ARB_EID, 50 ether);
         vm.expectRevert();
-        yzEnforcedComposer_arb.depositAndSend{value: fee}(50 ether, sendParam, userA);
+        yzEnforcedComposer_arb.depositAndSend{value: 0}(50 ether, sendParam, userA);
+        vm.stopPrank();
 
         // Verify caps integrity
         assertEq(yzEnforcedComposer_arb.userDepositCap(userA), 100 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 100 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 100 ether);
     }
 
     function test_RateLimitBypass_TVLManipulation_NotVulnerable() public {
@@ -272,7 +267,7 @@ contract YZEnforcedComposerRateLimitBypassTest is YZEnforcedComposerBase {
 
         // Verify TVL integrity
         assertEq(vault_arb.totalAssets(), 90 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userB), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userB), 0);
     }
 
     function test_RateLimitBypass_ReentrancyBypass_NotVulnerable() public {
@@ -325,7 +320,7 @@ contract YZEnforcedComposerRateLimitBypassTest is YZEnforcedComposerBase {
 
         // Verify gas manipulation doesn't bypass enforcement
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
     }
 
     function test_RateLimitBypass_BatchOperations_NotVulnerable() public {
@@ -361,8 +356,8 @@ contract YZEnforcedComposerRateLimitBypassTest is YZEnforcedComposerBase {
 
         // Verify batch operations don't bypass enforcement
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userB), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userB), 0);
     }
 
     function test_RateLimitBypass_TimingAttack_NotVulnerable() public {
@@ -406,7 +401,7 @@ contract YZEnforcedComposerRateLimitBypassTest is YZEnforcedComposerBase {
 
         // Verify timing attack prevention
         assertEq(vault_arb.totalAssets(), 100 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userC), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userC), 0);
     }
 }
 

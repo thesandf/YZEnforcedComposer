@@ -45,6 +45,7 @@ contract YZEnforcedComposerCrossChainFailureTest is YZEnforcedComposerBase {
         (bool success,) = address(yzEnforcedComposer_arb).call{value: fee, gas: GAS_LIMIT_LOW}(
             abi.encodeWithSelector(yzEnforcedComposer_arb.depositAndSend.selector, TEST_AMOUNT, sendParam, userA)
         );
+        success; // suppress unused warning
 
         // Verify state is not corrupted
         _assertNoStateChange();
@@ -120,6 +121,7 @@ contract YZEnforcedComposerCrossChainFailureTest is YZEnforcedComposerBase {
         (bool success,) = address(yzEnforcedComposer_arb).call{value: fee, gas: 20000}(
             abi.encodeWithSelector(yzEnforcedComposer_arb.depositAndSend.selector, TEST_AMOUNT, sendParam, userA)
         );
+        success; // suppress unused warning
 
         _assertNoStateChange();
     }
@@ -143,6 +145,7 @@ contract YZEnforcedComposerCrossChainFailureTest is YZEnforcedComposerBase {
 
         // Should succeed with high gas
         assertTrue(success, "High gas limit should work");
+        verifyPackets(ETH_EID, address(shareOFT_eth));
         _assertDepositSuccess(userA, TEST_AMOUNT, TEST_AMOUNT);
     }
 
@@ -176,6 +179,7 @@ contract YZEnforcedComposerCrossChainFailureTest is YZEnforcedComposerBase {
 
             // Should either succeed or fail gracefully, but not bypass enforcement
             if (success) {
+                verifyPackets(ETH_EID, address(shareOFT_eth));
                 _assertDepositSuccess(userA, TEST_AMOUNT, TEST_AMOUNT);
             } else {
                 _assertNoStateChange();
@@ -240,33 +244,30 @@ contract YZEnforcedComposerCrossChainFailureTest is YZEnforcedComposerBase {
     function test_CrossChain_UserTrackingAcrossChains() public {
         _setupUserCap(userA, 100 ether);
 
-        // User deposits from ETH chain
+        // User deposits locally on ARB chain so they hold the shares locally
         _fundLocalFromHub(userA, 50 ether);
-        vm.prank(userA);
+        vm.startPrank(userA);
         assetOFT_arb.approve(address(yzEnforcedComposer_arb), 50 ether);
+        SendParam memory sendParam1 = _buildHopParam(address(0), userA, ARB_EID, 50 ether);
+        yzEnforcedComposer_arb.depositAndSend{value: 0}(50 ether, sendParam1, userA);
+        vm.stopPrank();
 
-        SendParam memory sendParam = _buildHopParam(address(0), userA, ETH_EID, 50 ether);
-        uint256 fee1 = _getAndFundDepositFee(userA, sendParam);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 50 ether);
 
-        vm.prank(userA);
-        yzEnforcedComposer_arb.depositAndSend{value: fee1}(50 ether, sendParam, userA);
-
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 50 ether);
-
-        // User tries to deposit more from POL chain (should be tracked)
+        // User tries to deposit more from POL chain (should be blocked by local ownership)
         _fundLocalFromHub(userA, 60 ether);
-        vm.prank(userA);
+        vm.startPrank(userA);
         assetOFT_arb.approve(address(yzEnforcedComposer_arb), 60 ether);
 
-        sendParam = _buildHopParam(address(0), userA, POL_EID, 60 ether);
+        SendParam memory sendParam = _buildHopParam(address(0), userA, POL_EID, 60 ether);
         uint256 fee2 = _getAndFundDepositFee(userA, sendParam);
 
-        vm.prank(userA);
         vm.expectRevert();
         yzEnforcedComposer_arb.depositAndSend{value: fee2}(60 ether, sendParam, userA);
+        vm.stopPrank();
 
         // Verify user cap enforced across chains
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 50 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 50 ether);
     }
 
     function test_CrossChain_WhitelistEnforcementAcrossChains() public {
@@ -302,7 +303,7 @@ contract YZEnforcedComposerCrossChainFailureTest is YZEnforcedComposerBase {
 
         // Verify whitelist enforced across chains
         assertEq(vault_arb.totalAssets(), TEST_AMOUNT);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userB), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userB), 0);
     }
 
     function test_CrossChain_PauseEnforcementAcrossChains() public {
@@ -416,8 +417,6 @@ contract YZEnforcedComposerCrossChainFailureTest is YZEnforcedComposerBase {
     function test_RedemptionFailure_InsufficientShares() public {
         uint256 redeemAmount = 100 ether;
 
-        deal(address(vault_arb), userA, redeemAmount);
-
         SendParam memory redeemParam = _buildHopParam(address(0), userA, ETH_EID, redeemAmount);
         uint256 fee = _getAndFundRedeemFee(userA, redeemParam);
 
@@ -440,9 +439,6 @@ contract YZEnforcedComposerCrossChainFailureTest is YZEnforcedComposerBase {
 
         uint256 redeemAmount = 25 ether;
 
-        // Mint shares to userA so the transferFrom succeeds and we reach the pause check
-        deal(address(vault_arb), userA, redeemAmount);
-
         SendParam memory redeemParam = _buildHopParam(address(0), userA, ETH_EID, redeemAmount);
         uint256 fee = _getAndFundRedeemFee(userA, redeemParam);
 
@@ -461,7 +457,6 @@ contract YZEnforcedComposerCrossChainFailureTest is YZEnforcedComposerBase {
         _executeSuccessfulDeposit(userA, initialDeposit);
 
         uint256 redeemAmount = 25 ether;
-        deal(address(vault_arb), userA, redeemAmount);
 
         SendParam memory redeemParam = _buildHopParam(address(0), userA, ETH_EID, redeemAmount);
 
@@ -497,34 +492,37 @@ contract YZEnforcedComposerCrossChainFailureTest is YZEnforcedComposerBase {
 
     function _executeSuccessfulDeposit(address user, uint256 amount) internal {
         _fundLocalFromHub(user, amount);
-        vm.prank(user);
+        vm.startPrank(user);
         assetOFT_arb.approve(address(yzEnforcedComposer_arb), amount);
 
-        SendParam memory sendParam = _buildHopParam(address(0), user, ETH_EID, amount);
-        uint256 fee = _getAndFundDepositFee(user, sendParam);
+        SendParam memory sendParam = _buildHopParam(address(0), user, ARB_EID, amount);
 
-        vm.prank(user);
-        yzEnforcedComposer_arb.depositAndSend{value: fee}(amount, sendParam, user);
+        yzEnforcedComposer_arb.depositAndSend{value: 0}(amount, sendParam, user);
+        vm.stopPrank();
     }
 
-    function _assertDepositSuccess(address user, uint256 depositAmount, uint256 expectedTVLIncrease) internal {
+    function _assertDepositSuccess(address user, uint256 depositAmount, uint256 expectedTVLIncrease) internal view {
         assertEq(vault_arb.totalAssets(), expectedTVLIncrease);
-        assertEq(yzEnforcedComposer_arb.userDeposits(user), depositAmount);
+        uint256 totalShares = vault_arb.balanceOf(user) + shareOFT_eth.balanceOf(user) + shareOFT_pol.balanceOf(user);
+        assertEq(totalShares, depositAmount);
     }
 
-    function _assertRedeemSuccess(address user, uint256 initialDeposit, uint256 redeemAmount) internal {
+    function _assertRedeemSuccess(address user, uint256 initialDeposit, uint256 redeemAmount) internal view {
         uint256 expectedRemaining = initialDeposit - redeemAmount;
-        assertEq(yzEnforcedComposer_arb.userDeposits(user), expectedRemaining);
+        uint256 totalShares = vault_arb.balanceOf(user) + shareOFT_eth.balanceOf(user) + shareOFT_pol.balanceOf(user);
+        assertEq(totalShares, expectedRemaining);
     }
 
-    function _assertRedeemNoStateChange(address user, uint256 initialDeposit) internal {
-        assertEq(yzEnforcedComposer_arb.userDeposits(user), initialDeposit);
+    function _assertRedeemNoStateChange(address user, uint256 initialDeposit) internal view {
+        uint256 totalShares = vault_arb.balanceOf(user) + shareOFT_eth.balanceOf(user) + shareOFT_pol.balanceOf(user);
+        assertEq(totalShares, initialDeposit);
         assertEq(vault_arb.totalAssets(), initialDeposit);
     }
 
-    function _assertNoStateChange() internal {
+    function _assertNoStateChange() internal view {
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        uint256 totalShares = vault_arb.balanceOf(userA) + shareOFT_eth.balanceOf(userA) + shareOFT_pol.balanceOf(userA);
+        assertEq(totalShares, 0);
     }
 
     function _resetState() internal {

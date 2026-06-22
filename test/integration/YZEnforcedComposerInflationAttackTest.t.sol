@@ -126,7 +126,7 @@ contract YZEnforcedComposerInflationAttackTest is YZEnforcedComposerBase {
         yzEnforcedComposer_arb.depositAndSend(60 ether, sendParam, userA);
 
         // Verify tracking integrity
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 50 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 50 ether);
     }
 
     function test_InflationAttack_SharePriceManipulation_NotVulnerable() public {
@@ -210,8 +210,8 @@ contract YZEnforcedComposerInflationAttackTest is YZEnforcedComposerBase {
 
         // Verify caps still enforced
         assertEq(vault_arb.totalAssets(), 200 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 100 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userB), 100 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 100 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userB), 100 ether);
     }
 
     function test_InflationAttack_WhitelistBypass_NotVulnerable() public {
@@ -246,7 +246,7 @@ contract YZEnforcedComposerInflationAttackTest is YZEnforcedComposerBase {
 
         // Verify whitelist still enforced
         assertEq(vault_arb.totalAssets(), 50 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(manipulatedAddress), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(manipulatedAddress), 0);
     }
 
     function test_InflationAttack_PauseBypass_NotVulnerable() public {
@@ -279,7 +279,7 @@ contract YZEnforcedComposerInflationAttackTest is YZEnforcedComposerBase {
 
         // Verify pause enforced across all chains
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
     }
 
     function test_InflationAttack_CapManipulation_NotVulnerable() public {

@@ -180,7 +180,7 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
                         INVARIANT TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function invariant_TVLNeverExceedsCap() public {
+    function invariant_TVLNeverExceedsCap() public view {
         uint256 currentTVL = vault_arb.totalAssets();
         uint256 tvlCap = yzEnforcedComposer_arb.tvlCap();
 
@@ -189,11 +189,11 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
         }
     }
 
-    function invariant_UserDepositsNeverExceedCaps() public {
+    function invariant_UserDepositsNeverExceedCaps() public view {
         address[] memory users = _getFuzzUsers();
 
         for (uint256 i = 0; i < users.length; i++) {
-            uint256 userDeposit = yzEnforcedComposer_arb.userDeposits(users[i]);
+            uint256 userDeposit = yzEnforcedComposer_arb.getUserAssets(users[i]);
             uint256 userCap = yzEnforcedComposer_arb.userDepositCap(users[i]);
 
             if (userCap > 0) {
@@ -202,12 +202,12 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
         }
     }
 
-    function invariant_TotalUserDepositsEqualsTVL() public {
+    function invariant_TotalUserDepositsEqualsTVL() public view {
         address[] memory users = _getFuzzUsers();
         uint256 totalUserDeposits = 0;
 
         for (uint256 i = 0; i < users.length; i++) {
-            totalUserDeposits += yzEnforcedComposer_arb.userDeposits(users[i]);
+            totalUserDeposits += yzEnforcedComposer_arb.getUserAssets(users[i]);
         }
 
         uint256 actualTVL = vault_arb.totalAssets();
@@ -218,7 +218,7 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
         assertLe(diff, 1 ether, "Total user deposits should equal TVL within rounding");
     }
 
-    function invariant_ShareSupplyConsistentWithDeposits() public {
+    function invariant_ShareSupplyConsistentWithDeposits() public view {
         uint256 totalShares = vault_arb.totalSupply();
         uint256 totalAssets = vault_arb.totalAssets();
 
@@ -294,7 +294,7 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
         yzEnforcedComposer_arb.setAdmin(nonAdmin);
     }
 
-    function invariant_ViewFunctionsConsistency() public {
+    function invariant_ViewFunctionsConsistency() public view {
         address testUser = userA;
         uint256 userShares = vault_arb.balanceOf(testUser);
         uint256 userAssets = vault_arb.convertToAssets(userShares);
@@ -308,13 +308,13 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
         // getTotalValueLocked should match vault totalAssets
         assertEq(yzEnforcedComposer_arb.getTotalValueLocked(), vault_arb.totalAssets());
 
-        // getUserDepositInfo should be consistent
-        (uint256 deposit, uint256 cap, uint256 remaining) = yzEnforcedComposer_arb.getUserDepositInfo(testUser);
-        assertEq(deposit, yzEnforcedComposer_arb.userDeposits(testUser));
+        // getUserCapUsage should be consistent
+        (uint256 ownership, uint256 cap, uint256 remaining) = yzEnforcedComposer_arb.getUserCapUsage(testUser);
+        assertEq(ownership, yzEnforcedComposer_arb.getUserAssets(testUser));
         assertEq(cap, yzEnforcedComposer_arb.userDepositCap(testUser));
 
         if (cap > 0) {
-            assertEq(remaining, cap - deposit);
+            assertEq(remaining, cap - ownership);
         }
     }
 
@@ -327,7 +327,7 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
 
         // Record starting balances
         uint256 startTVL = vault_arb.totalAssets();
-        uint256 startUserDeposit = yzEnforcedComposer_arb.userDeposits(testUser);
+        uint256 startUserDeposit = yzEnforcedComposer_arb.getUserAssets(testUser);
 
         // Test the prediction by attempting the actual deposit
         _fundLocalFromHub(testUser, testAmount);
@@ -343,7 +343,7 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
 
             assertEq(vault_arb.totalAssets(), startTVL + testAmount, "TVL did not increase by deposit amount");
             assertEq(
-                yzEnforcedComposer_arb.userDeposits(testUser),
+                yzEnforcedComposer_arb.getUserAssets(testUser),
                 startUserDeposit + testAmount,
                 "User deposit tracking did not increase"
             );
@@ -355,7 +355,7 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
 
             assertEq(vault_arb.totalAssets(), startTVL, "TVL changed on reverted deposit");
             assertEq(
-                yzEnforcedComposer_arb.userDeposits(testUser),
+                yzEnforcedComposer_arb.getUserAssets(testUser),
                 startUserDeposit,
                 "User deposit tracking changed on reverted deposit"
             );
@@ -461,14 +461,14 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
         }
     }
 
-    function _fuzzViewOperations() internal {
+    function _fuzzViewOperations() internal view {
         address user = _getRandomUser();
 
         // Test view functions
         yzEnforcedComposer_arb.getTotalValueLocked();
         yzEnforcedComposer_arb.getUserShares(user);
         yzEnforcedComposer_arb.getUserAssets(user);
-        yzEnforcedComposer_arb.getUserDepositInfo(user);
+        yzEnforcedComposer_arb.getUserCapUsage(user);
         yzEnforcedComposer_arb.canDeposit(user, _getRandomAmount());
     }
 
@@ -522,10 +522,10 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
         yzEnforcedComposer_arb.setWhitelist(user, status);
     }
 
-    function _fuzzUserViewOperations(address user) internal {
+    function _fuzzUserViewOperations(address user) internal view {
         yzEnforcedComposer_arb.getUserShares(user);
         yzEnforcedComposer_arb.getUserAssets(user);
-        yzEnforcedComposer_arb.getUserDepositInfo(user);
+        yzEnforcedComposer_arb.getUserCapUsage(user);
         yzEnforcedComposer_arb.canDeposit(user, _getRandomAmount());
     }
 
@@ -837,9 +837,9 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
         invariant_CanDepositAccuracy();
     }
 
-    function _checkMultiUserInvariants(address[] memory users) internal {
+    function _checkMultiUserInvariants(address[] memory users) internal view {
         for (uint256 i = 0; i < users.length; i++) {
-            uint256 userDeposit = yzEnforcedComposer_arb.userDeposits(users[i]);
+            uint256 userDeposit = yzEnforcedComposer_arb.getUserAssets(users[i]);
             uint256 userCap = yzEnforcedComposer_arb.userDepositCap(users[i]);
 
             if (userCap > 0) {
@@ -850,7 +850,7 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
         // Check total across all users
         uint256 totalUserDeposits = 0;
         for (uint256 i = 0; i < users.length; i++) {
-            totalUserDeposits += yzEnforcedComposer_arb.userDeposits(users[i]);
+            totalUserDeposits += yzEnforcedComposer_arb.getUserAssets(users[i]);
         }
 
         uint256 actualTVL = vault_arb.totalAssets();
@@ -859,7 +859,7 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
         assertLe(diff, 1 ether, "Total user deposits should equal TVL within rounding");
     }
 
-    function _checkCapInvariants() internal {
+    function _checkCapInvariants() internal view {
         uint256 currentTVL = vault_arb.totalAssets();
         uint256 tvlCap = yzEnforcedComposer_arb.tvlCap();
 
@@ -959,18 +959,18 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
     }
 
     function _getRandomUser() internal view returns (address) {
-        uint256 random = uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty)));
+        uint256 random = uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao)));
         uint256 index = random % 10;
         return address(uint160(uint256(keccak256(abi.encodePacked("fuzzUser", index)))));
     }
 
     function _getRandomAmount() internal view returns (uint256) {
-        uint256 random = uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty, block.coinbase)));
+        uint256 random = uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao, block.coinbase)));
         return (random % MAX_FUZZ_AMOUNT) + MIN_FUZZ_AMOUNT;
     }
 
     function _getRandomBool() internal view returns (bool) {
-        uint256 random = uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty)));
+        uint256 random = uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao)));
         return random % 2 == 0;
     }
 
@@ -999,14 +999,14 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
         yzEnforcedComposer_arb.setTVLCap(cap);
     }
 
-    function _assertDepositSuccess(address user, uint256 depositAmount, uint256 expectedTVLIncrease) internal {
+    function _assertDepositSuccess(address user, uint256 depositAmount, uint256 expectedTVLIncrease) internal view {
         assertEq(vault_arb.totalAssets(), expectedTVLIncrease);
-        assertEq(yzEnforcedComposer_arb.userDeposits(user), depositAmount);
+        assertEq(yzEnforcedComposer_arb.getUserShares(user), depositAmount);
     }
 
-    function _assertNoStateChange() internal {
+    function _assertNoStateChange() internal view {
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userA), 0);
     }
 
     function _prepareExpectRevert(address user, uint256 amount) internal returns (bool willRevert) {
@@ -1027,7 +1027,7 @@ contract YZEnforcedComposerStatefulFuzzTest is YZEnforcedComposerBase {
             return true;
         }
         uint256 userCap = yzEnforcedComposer_arb.userDepositCap(user);
-        uint256 currentUserDeposit = yzEnforcedComposer_arb.userDeposits(user);
+        uint256 currentUserDeposit = yzEnforcedComposer_arb.getUserAssets(user);
         if (userCap > 0 && currentUserDeposit + amount > userCap) {
             vm.expectRevert(
                 abi.encodeWithSelector(

@@ -94,9 +94,9 @@ contract YZEnforcedComposerShareDilutionTest is YZEnforcedComposerBase {
         assertEq(vault_arb.totalAssets(), expectedTVL);
 
         // Verify user deposit tracking reflects actual contributions
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 50 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userB), 30 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userC), 40 ether);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userA), 50 ether);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userB), 30 ether);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userC), 32 ether);
     }
 
     function test_ShareDilution_RebalanceProtection() public {
@@ -142,7 +142,7 @@ contract YZEnforcedComposerShareDilutionTest is YZEnforcedComposerBase {
 
         // Verify no dilution through cap bypass
         assertEq(vault_arb.totalAssets(), tvlBefore);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userC), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userC), 0);
     }
 
     function test_ShareDilution_WhitelistDilutionPrevention() public {
@@ -186,7 +186,7 @@ contract YZEnforcedComposerShareDilutionTest is YZEnforcedComposerBase {
 
         // Verify whitelist prevents dilution
         assertEq(vault_arb.totalAssets(), 100 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userC), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userC), 0);
 
         // Verify existing users' ownership unchanged
         uint256 userAShares = vault_arb.balanceOf(userA);
@@ -223,7 +223,7 @@ contract YZEnforcedComposerShareDilutionTest is YZEnforcedComposerBase {
 
         // Verify pause prevents dilution
         assertEq(vault_arb.totalAssets(), 100 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userB), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userB), 0);
         assertEq(vault_arb.balanceOf(userA), 100 ether);
     }
 
@@ -269,8 +269,8 @@ contract YZEnforcedComposerShareDilutionTest is YZEnforcedComposerBase {
         yzEnforcedComposer_arb.depositAndSend(100 ether, sendParam, userB);
 
         // Verify user caps prevent dilution
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 100 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userB), 100 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 100 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userB), 100 ether);
         assertEq(vault_arb.totalAssets(), 200 ether);
     }
 
@@ -314,7 +314,7 @@ contract YZEnforcedComposerShareDilutionTest is YZEnforcedComposerBase {
 
         // Verify cross-chain dilution prevention
         assertEq(vault_arb.totalAssets(), 140 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userC), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userC), 0);
     }
 
     function test_ShareDilution_RedemptionImpact() public {

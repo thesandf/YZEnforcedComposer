@@ -253,14 +253,14 @@ contract YZEnforcedComposerGasBenchmarkTest is YZEnforcedComposerBase {
         assertLt(gasUsed, 20000, "getUserAssets gas usage too high");
         emit log_named_uint("getUserAssets Gas Used", gasUsed);
 
-        // Test getUserDepositInfo gas usage
+        // Test getUserCapUsage gas usage
         gasBefore = gasleft();
-        yzEnforcedComposer_arb.getUserDepositInfo(userA);
+        yzEnforcedComposer_arb.getUserCapUsage(userA);
         gasAfter = gasleft();
         gasUsed = gasBefore - gasAfter;
 
-        assertLt(gasUsed, 20000, "getUserDepositInfo gas usage too high");
-        emit log_named_uint("getUserDepositInfo Gas Used", gasUsed);
+        assertLt(gasUsed, 20000, "getUserCapUsage gas usage too high");
+        emit log_named_uint("getUserCapUsage Gas Used", gasUsed);
 
         // Test canDeposit gas usage
         gasBefore = gasleft();
@@ -504,7 +504,7 @@ contract YZEnforcedComposerGasBenchmarkTest is YZEnforcedComposerBase {
         // Multiple read operations
         yzEnforcedComposer_arb.tvlCap();
         yzEnforcedComposer_arb.userDepositCap(userA);
-        yzEnforcedComposer_arb.userDeposits(userA);
+        yzEnforcedComposer_arb.getUserShares(userA);
         yzEnforcedComposer_arb.depositsPaused();
         yzEnforcedComposer_arb.redemptionsPaused();
 

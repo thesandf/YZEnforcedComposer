@@ -216,7 +216,7 @@ contract YZEnforcedComposerUnitTest is YZEnforcedComposerBase {
         _executeSuccessfulRedeem(userA, redeemAmount);
 
         _assertRedeemSuccess(userA, initialDeposit, redeemAmount);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userA), 0);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -459,16 +459,16 @@ contract YZEnforcedComposerUnitTest is YZEnforcedComposerBase {
         assertEq(actualAssets, expectedAssets);
     }
 
-    function test_GetUserDepositInfo_ReturnsCorrectValues() public {
+    function test_GetUserCapUsage_ReturnsCorrectValues() public {
         uint256 userCap = 100 ether;
         _setupUserCap(userA, userCap);
 
         uint256 depositAmount = 50 ether;
         _executeSuccessfulDeposit(userA, depositAmount);
 
-        (uint256 deposit, uint256 cap, uint256 remaining) = yzEnforcedComposer_arb.getUserDepositInfo(userA);
+        (uint256 ownership, uint256 cap, uint256 remaining) = yzEnforcedComposer_arb.getUserCapUsage(userA);
 
-        assertEq(deposit, depositAmount);
+        assertEq(ownership, depositAmount);
         assertEq(cap, userCap);
         assertEq(remaining, userCap - depositAmount);
     }
@@ -612,21 +612,21 @@ contract YZEnforcedComposerUnitTest is YZEnforcedComposerBase {
 
     function _assertDepositSuccess(address user, uint256 depositAmount, uint256 expectedTVLIncrease) internal {
         assertEq(vault_arb.totalAssets(), expectedTVLIncrease);
-        assertEq(yzEnforcedComposer_arb.userDeposits(user), depositAmount);
+        assertEq(yzEnforcedComposer_arb.getUserShares(user), depositAmount);
     }
 
     function _assertRedeemSuccess(address user, uint256 initialDeposit, uint256 redeemAmount) internal {
         uint256 expectedRemaining = initialDeposit - redeemAmount;
-        assertEq(yzEnforcedComposer_arb.userDeposits(user), expectedRemaining);
+        assertEq(yzEnforcedComposer_arb.getUserShares(user), expectedRemaining);
     }
 
     function _assertRedeemNoStateChange(address user, uint256 initialDeposit) internal {
-        assertEq(yzEnforcedComposer_arb.userDeposits(user), initialDeposit);
+        assertEq(yzEnforcedComposer_arb.getUserShares(user), initialDeposit);
         assertEq(vault_arb.totalAssets(), initialDeposit);
     }
 
     function _assertNoStateChange() internal {
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userA), 0);
     }
 }

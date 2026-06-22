@@ -46,7 +46,7 @@ contract YZEnforcedComposerReentrancyTest is YZEnforcedComposerBase {
 
         // Verify no state corruption
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
     }
 
     function test_Reentrancy_RedeemAndSend_NotVulnerable() public {
@@ -74,7 +74,7 @@ contract YZEnforcedComposerReentrancyTest is YZEnforcedComposerBase {
 
         // Verify no state corruption
         assertEq(vault_arb.totalAssets(), 100 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 100 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 100 ether);
     }
 
     function test_Reentrancy_EnforcementChecks_NotVulnerable() public {
@@ -108,7 +108,7 @@ contract YZEnforcedComposerReentrancyTest is YZEnforcedComposerBase {
 
         // Verify caps still enforced
         assertEq(vault_arb.totalAssets(), 50 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 50 ether);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 50 ether);
     }
 
     function test_Reentrancy_PauseControls_NotVulnerable() public {

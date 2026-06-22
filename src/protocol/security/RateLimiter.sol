@@ -23,13 +23,32 @@ contract RateLimiter is Ownable {
     /// @notice Tracks when a user last performed an action
     mapping(address user => uint256 timestamp) public lastOperationTime;
 
+    /// @notice Tracks authorized caller addresses (e.g. Composer contracts)
+    mapping(address => bool) public authorizedCallers;
+
+    error UnauthorizedCaller();
+
     event RateLimitUpdated(uint256 newLimit);
     event OperationLimited(address indexed user, uint256 timestamp);
     event OperationRecorded(address indexed user, uint256 count, uint256 window);
+    event AuthorizedCallerUpdated(address indexed caller, bool status);
+
+    modifier onlyAuthorized() {
+        if (!authorizedCallers[msg.sender]) revert UnauthorizedCaller();
+        _;
+    }
 
     constructor(uint256 _maxOperationsPerWindow, address _owner) Ownable(_owner) {
         if (_maxOperationsPerWindow == 0) revert YZRateLimiter_InvalidLimit();
         maxOperationsPerWindow = _maxOperationsPerWindow;
+    }
+
+    /**
+     * @notice Set caller authorization status (owner only)
+     */
+    function setAuthorizedCaller(address caller, bool status) external onlyOwner {
+        authorizedCallers[caller] = status;
+        emit AuthorizedCallerUpdated(caller, status);
     }
 
     /**
@@ -45,7 +64,7 @@ contract RateLimiter is Ownable {
      * @notice Record an operation for a user
      * @dev Should be called by vault/composer after validating the operation
      */
-    function recordOperation(address user) external {
+    function recordOperation(address user) external onlyAuthorized {
         uint256 currentWindow = block.timestamp / RATE_LIMIT_WINDOW;
         uint256 count = operationCount[user][currentWindow];
 

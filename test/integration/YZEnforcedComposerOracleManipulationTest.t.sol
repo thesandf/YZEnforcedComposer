@@ -47,8 +47,6 @@ contract YZEnforcedComposerOracleManipulationTest is YZEnforcedComposerBase {
     }
 
     function test_OracleManipulation_TVLReporting_NotVulnerable() public {
-        YZEnforcedComposer mockComposer = YZEnforcedComposer(payable(getComposerForVault(address(mockVault))));
-
         // Setup TVL cap
         vm.prank(admin);
         mockComposer.setTVLCap(100 ether);
@@ -65,7 +63,7 @@ contract YZEnforcedComposerOracleManipulationTest is YZEnforcedComposerBase {
 
         // Verify normal operation
         assertEq(mockVault.totalAssets(), 50 ether);
-        assertEq(mockComposer.userDeposits(userA), 50 ether);
+        assertEq(mockComposer.getUserAssets(userA), 50 ether);
 
         // Simulate oracle manipulation - artificially inflate TVL
         mockVault.setTotalAssets(200 ether);
@@ -87,8 +85,6 @@ contract YZEnforcedComposerOracleManipulationTest is YZEnforcedComposerBase {
     }
 
     function test_OracleManipulation_SharePrice_NotVulnerable() public {
-        YZEnforcedComposer mockComposer = YZEnforcedComposer(payable(getComposerForVault(address(mockVault))));
-
         // Normal deposit
         _fundLocalFromHub(userA, 100 ether);
         vm.prank(userA);
@@ -117,8 +113,6 @@ contract YZEnforcedComposerOracleManipulationTest is YZEnforcedComposerBase {
     }
 
     function test_OracleManipulation_UserDepositTracking_NotVulnerable() public {
-        YZEnforcedComposer mockComposer = YZEnforcedComposer(payable(getComposerForVault(address(mockVault))));
-
         // Setup user cap
         vm.prank(admin);
         mockComposer.setUserCap(userA, 100 ether);
@@ -150,14 +144,12 @@ contract YZEnforcedComposerOracleManipulationTest is YZEnforcedComposerBase {
         mockComposer.depositAndSend(60 ether, sendParam, userA);
 
         // Verify tracking integrity
-        assertEq(mockComposer.userDeposits(userA), 50 ether); // Should reflect actual value
+        assertEq(mockComposer.getUserAssets(userA), 50 ether); // Should reflect actual value
         // This test shows that direct manipulation of storage is possible,
         // but only by admin (who has exposed_setUserDeposit access)
     }
 
     function test_OracleManipulation_SlippageProtection_NotVulnerable() public {
-        YZEnforcedComposer mockComposer = YZEnforcedComposer(payable(getComposerForVault(address(mockVault))));
-
         // Normal deposit with slippage protection
         _fundLocalFromHub(userA, 100 ether);
         vm.prank(userA);
@@ -188,8 +180,6 @@ contract YZEnforcedComposerOracleManipulationTest is YZEnforcedComposerBase {
     }
 
     function test_OracleManipulation_TVLTracking_Accuracy() public {
-        YZEnforcedComposer mockComposer = YZEnforcedComposer(payable(getComposerForVault(address(mockVault))));
-
         // Setup TVL cap
         vm.prank(admin);
         mockComposer.setTVLCap(200 ether);
@@ -237,8 +227,6 @@ contract YZEnforcedComposerOracleManipulationTest is YZEnforcedComposerBase {
     }
 
     function test_OracleManipulation_ReentrancyDuringOracleCall_NotVulnerable() public {
-        YZEnforcedComposer mockComposer = YZEnforcedComposer(payable(getComposerForVault(address(mockVault))));
-
         // Setup malicious oracle that tries reentrancy
         MaliciousOracle maliciousOracle = new MaliciousOracle(address(mockComposer));
         mockVault.setOracle(address(maliciousOracle));
@@ -256,12 +244,10 @@ contract YZEnforcedComposerOracleManipulationTest is YZEnforcedComposerBase {
 
         // Verify no state corruption
         assertEq(mockVault.totalAssets(), 0);
-        assertEq(mockComposer.userDeposits(userA), 0);
+        assertEq(mockComposer.getUserShares(userA), 0);
     }
 
     function test_OracleManipulation_PriceFeedManipulation_NotVulnerable() public {
-        YZEnforcedComposer mockComposer = YZEnforcedComposer(payable(getComposerForVault(address(mockVault))));
-
         // Normal operation
         _fundLocalFromHub(userA, 100 ether);
         vm.prank(userA);
@@ -290,8 +276,6 @@ contract YZEnforcedComposerOracleManipulationTest is YZEnforcedComposerBase {
     }
 
     function test_OracleManipulation_ExternalPriceOracle_NotVulnerable() public {
-        YZEnforcedComposer mockComposer = YZEnforcedComposer(payable(getComposerForVault(address(mockVault))));
-
         // Setup external price oracle
         ExternalPriceOracle priceOracle = new ExternalPriceOracle();
         mockVault.setExternalPriceOracle(address(priceOracle));

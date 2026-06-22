@@ -16,14 +16,14 @@ contract YZEnforcedComposerTrackingTest is YZEnforcedComposerBase {
         vm.prank(userA);
         yzEnforcedComposer_arb.depositAndSend(50 ether, sendParam, userA);
 
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 50 ether);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userA), 50 ether);
 
         sendParam = _buildHopParam(address(0), userA, ARB_EID, 30 ether);
 
         vm.prank(userA);
         yzEnforcedComposer_arb.depositAndSend(30 ether, sendParam, userA);
 
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 80 ether);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userA), 80 ether);
     }
 
     function test_UserDepositTracking_UsesActualTVLIncrease() public {
@@ -41,7 +41,7 @@ contract YZEnforcedComposerTrackingTest is YZEnforcedComposerBase {
         uint256 tvlAfter = vault_arb.totalAssets();
         uint256 actualTvlIncrease = tvlAfter - tvlBefore;
 
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), actualTvlIncrease);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), actualTvlIncrease);
     }
 
     function test_Redeem_DecreasesUserDepositTracking() public {
@@ -54,7 +54,7 @@ contract YZEnforcedComposerTrackingTest is YZEnforcedComposerBase {
         vm.prank(userA);
         yzEnforcedComposer_arb.depositAndSend(100 ether, depositParam, userA);
 
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 100 ether);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userA), 100 ether);
 
         vm.prank(userA);
         vault_arb.approve(address(yzEnforcedComposer_arb), 50 ether);
@@ -64,14 +64,7 @@ contract YZEnforcedComposerTrackingTest is YZEnforcedComposerBase {
         vm.prank(userA);
         yzEnforcedComposer_arb.redeemAndSend(50 ether, redeemParam, userA);
 
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 50 ether);
-    }
-
-    function test_ExposedSetUserDeposit_Reverts() public {
-        vm.prank(admin);
-        (bool success,) = address(yzEnforcedComposer_arb)
-            .call(abi.encodeWithSignature("exposed_setUserDeposit(address,uint256)", userA, 100 ether));
-        assertFalse(success);
+        assertEq(yzEnforcedComposer_arb.getUserShares(userA), 50 ether);
     }
 
     function testFuzz_Redeem_NeverUnderflowsTracking(uint256 _depositAmount, uint256 _redeemAmount) public {
@@ -95,6 +88,6 @@ contract YZEnforcedComposerTrackingTest is YZEnforcedComposerBase {
         vm.prank(userA);
         yzEnforcedComposer_arb.redeemAndSend(_redeemAmount, redeemParam, userA);
 
-        assertGe(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertGe(yzEnforcedComposer_arb.getUserShares(userA), 0);
     }
 }

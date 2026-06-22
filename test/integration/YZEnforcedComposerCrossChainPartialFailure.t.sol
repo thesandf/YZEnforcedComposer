@@ -50,7 +50,7 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // Verify source state is not corrupted
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
     }
 
     function test_SourceStateUpdate_MessageExecutionFailure() public {
@@ -78,7 +78,7 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // Verify state consistency
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
     }
 
     function test_SourceStateUpdate_InsufficientFees() public {
@@ -100,7 +100,7 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // Verify no state change
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -113,8 +113,9 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // First successful deposit
         _executeSuccessfulDeposit(userA, TEST_AMOUNT);
+        verifyPackets(ETH_EID, address(shareOFT_eth));
         assertEq(vault_arb.totalAssets(), TEST_AMOUNT);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), TEST_AMOUNT);
+        assertEq(shareOFT_eth.balanceOf(userA), TEST_AMOUNT);
 
         // We cannot easily simulate a generic message retry because the endpoints use nonces.
         // We simulate that the user calls deposit again with the SAME exact data but we revert on the second due to some mock.
@@ -139,7 +140,7 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // Verify no double credit
         assertEq(vault_arb.totalAssets(), TEST_AMOUNT);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), TEST_AMOUNT);
+        assertEq(shareOFT_eth.balanceOf(userA), TEST_AMOUNT);
     }
 
     function test_MessageRetry_DuplicateMessageDetection() public {
@@ -148,6 +149,7 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // Execute first deposit
         _executeSuccessfulDeposit(userA, TEST_AMOUNT);
+        verifyPackets(ETH_EID, address(shareOFT_eth));
 
         _fundLocalFromHub(userA, TEST_AMOUNT);
         vm.prank(userA);
@@ -170,7 +172,7 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // Verify no duplicate processing
         assertEq(vault_arb.totalAssets(), TEST_AMOUNT);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), TEST_AMOUNT);
+        assertEq(shareOFT_eth.balanceOf(userA), TEST_AMOUNT);
     }
 
     function test_MessageRetry_RetryAfterFailure() public {
@@ -205,10 +207,11 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         vm.prank(userA);
         yzEnforcedComposer_arb.depositAndSend{value: fee}(TEST_AMOUNT, sendParam, userA);
+        verifyPackets(ETH_EID, address(shareOFT_eth));
 
         // Verify successful retry
         assertEq(vault_arb.totalAssets(), TEST_AMOUNT);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), TEST_AMOUNT);
+        assertEq(shareOFT_eth.balanceOf(userA), TEST_AMOUNT);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -224,10 +227,11 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // Deposit 2 (simulating out of order by just doing another successful deposit, since sequence is handled by LZ)
         _executeSuccessfulDeposit(userA, 50 ether);
+        verifyPackets(ETH_EID, address(shareOFT_eth));
 
         // Verify correct total
         assertEq(vault_arb.totalAssets(), 75 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 75 ether);
+        assertEq(shareOFT_eth.balanceOf(userA), 75 ether);
     }
 
     function test_OutOfOrderMessages_CapEnforcement() public {
@@ -236,6 +240,7 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // Deposit near cap
         _executeSuccessfulDeposit(userA, 75 ether);
+        verifyPackets(ETH_EID, address(shareOFT_eth));
 
         _fundLocalFromHub(userA, 50 ether);
         vm.prank(userA);
@@ -251,7 +256,7 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // Verify cap enforced
         assertEq(vault_arb.totalAssets(), 75 ether);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 75 ether);
+        assertEq(shareOFT_eth.balanceOf(userA), 75 ether);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -327,7 +332,7 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // Verify atomic rollback
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
     }
 
     function test_Atomicity_ShareMintRollback() public {
@@ -355,7 +360,7 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // Verify share minting rolled back
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
     }
 
     function test_Atomicity_CapUpdateRollback() public {
@@ -382,7 +387,7 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
         vm.clearMockedCalls();
 
         // Verify cap update rolled back
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
         assertEq(vault_arb.totalAssets(), 0);
     }
 
@@ -415,7 +420,7 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // Verify graceful handling
         assertEq(vault_arb.totalAssets(), 0);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), 0);
+        assertEq(yzEnforcedComposer_arb.getUserAssets(userA), 0);
     }
 
     function test_FailureCombination_MultipleRetriesWithPartialSuccess() public {
@@ -424,6 +429,7 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // First deposit works
         _executeSuccessfulDeposit(userA, TEST_AMOUNT);
+        verifyPackets(ETH_EID, address(shareOFT_eth));
 
         // Second deposit fails
         _fundLocalFromHub(userA, TEST_AMOUNT);
@@ -445,7 +451,7 @@ contract YZEnforcedComposerCrossChainPartialFailureTest is YZEnforcedComposerBas
 
         // Verify correct final state (partial success from the first one)
         assertEq(vault_arb.totalAssets(), TEST_AMOUNT);
-        assertEq(yzEnforcedComposer_arb.userDeposits(userA), TEST_AMOUNT);
+        assertEq(shareOFT_eth.balanceOf(userA), TEST_AMOUNT);
     }
 
     /*//////////////////////////////////////////////////////////////
