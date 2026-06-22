@@ -353,29 +353,39 @@ This is enforced by LayerZero's architecture. No partial state, no stuck funds.
 │   │                                                      │      │
 │   │  State:                                              │      │
 │   │  - admin                    address                  │      │
+│   │  - pendingAdmin             address                  │      │
 │   │  - tvlCap                   uint256                  │      │
-│   │  - userDepositCap           mapping(address=>uint)   │      │
-│   │  - userDeposits             mapping(address=>uint)   │      │
-│   │  - paused                   bool                     │      │
+│   │  - userDepositCap           mapping(address=>uint256)│      │
+│   │  - userDeposits             mapping(address=>uint256)│      │
+│   │  - userShares               mapping(address=>uint256)│      │
+│   │  - depositsPaused           bool                     │      │
+│   │  - redemptionsPaused        bool                     │      │
 │   │  - whitelistEnabled         bool                     │      │
 │   │  - whitelist                mapping(address=>bool)   │      │
+│   │  - _tempSharesMinted        uint256                  │      │
 │   │                                                      │      │
 │   │  Admin Functions:                                    │      │
 │   │  + setTVLCap()                                       │      │
 │   │  + setUserCap()                                      │      │
-│   │  + pause() / unpause()                               │      │
-│   │  + setWhitelist()                                    │      │
-│   │  + setAdmin()                                        │      │
-│   │  + emergencyWithdraw()                               │      │
+│   │  + batchSetUserCaps()                                │      │
+│   │  + pauseDeposits() / unpauseDeposits()               │      │
+│   │  + pauseRedemptions() / unpauseRedemptions()         │      │
+│   │  + pauseAll() / unpauseAll()                         │      │
+│   │  + setWhitelistEnabled()                             │      │
+│   │  + setWhitelist() / batchSetWhitelist()              │      │
+│   │  + setAdmin() / proposeAdmin() / acceptAdmin()       │      │
+│   │  + emergencyWithdraw() / emergencyWithdrawNative()   │      │
 │   │                                                      │      │
 │   │  View Functions:                                     │      │
 │   │  + canDeposit()                                      │      │
 │   │  + getUserDepositInfo()                              │      │
 │   │  + getTotalValueLocked()                             │      │
+│   │  + getUserShares() / getUserAssets()                 │      │
 │   │                                                      │      │
 │   │  Overrides:                                          │      │
 │   │  # _depositAndSend()   ◄── adds enforcement          │      │
 │   │  # _redeemAndSend()    ◄── adds tracking             │      │
+│   │  # _deposit()          ◄── tracks actual shares      │      │
 │   │                                                      │      │
 │   └──────────────────────────────────────────────────────┘      │
 │                                                                 │
@@ -559,34 +569,48 @@ This is enforced by LayerZero's architecture. No partial state, no stuck funds.
 | `setTVLCap(uint256 cap)` | Set maximum TVL | Admin only |
 | `setUserCap(address user, uint256 cap)` | Set user deposit limit | Admin only |
 | `batchSetUserCaps(address[], uint256[])` | Batch set user caps | Admin only |
-| `pause()` | Stop all operations | Admin only |
-| `unpause()` | Resume operations | Admin only |
+| `pauseDeposits()` | Pause deposits only | Admin only |
+| `unpauseDeposits()` | Unpause deposits | Admin only |
+| `pauseRedemptions()` | Pause redemptions (extreme caution) | Admin only |
+| `unpauseRedemptions()` | Unpause redemptions | Admin only |
+| `pauseAll()` | Pause deposits and redemptions | Admin only |
+| `unpauseAll()` | Unpause all operations | Admin only |
 | `setWhitelistEnabled(bool)` | Enable/disable whitelist | Admin only |
 | `setWhitelist(address, bool)` | Set whitelist status | Admin only |
 | `batchSetWhitelist(address[], bool[])` | Batch whitelist | Admin only |
-| `setAdmin(address)` | Transfer admin role | Admin only |
+| `setAdmin(address)` | Transfer admin role directly | Admin only |
+| `proposeAdmin(address)` | Propose admin role (2-step setup) | Admin only |
+| `acceptAdmin()` | Accept admin role (2-step setup) | Pending admin |
 | `emergencyWithdraw(uint256, address)` | Withdraw stuck assets | Admin only |
+| `emergencyWithdrawShares(uint256, address)` | Withdraw stuck shares | Admin only |
+| `emergencyWithdrawNative(uint256, address)` | Withdraw stuck native ETH | Admin only |
 
 ### View Functions
 
 | Function | Returns | Description |
 |----------|---------|-------------|
 | `admin()` | address | Current admin |
+| `pendingAdmin()` | address | Pending admin |
 | `tvlCap()` | uint256 | TVL limit (0 = unlimited) |
 | `userDepositCap(address)` | uint256 | User's deposit limit |
 | `userDeposits(address)` | uint256 | User's tracked deposits |
-| `paused()` | bool | Pause state |
+| `userShares(address)` | uint256 | User's tracked shares |
+| `depositsPaused()` | bool | Deposit pause state |
+| `redemptionsPaused()` | bool | Redemption pause state |
 | `whitelistEnabled()` | bool | Whitelist mode |
 | `whitelist(address)` | bool | User whitelist status |
 | `canDeposit(address, uint256)` | (bool, string) | Check if deposit allowed |
 | `getUserDepositInfo(address)` | (uint256, uint256, uint256) | deposit, cap, remaining |
+| `getUserShares(address)` | uint256 | User's exact vault shares balance |
+| `getUserAssets(address)` | uint256 | User's exact asset value equivalent |
 | `getTotalValueLocked()` | uint256 | Current vault TVL |
 
 ### Errors
 
 | Error | Trigger |
 |-------|---------|
-| `YZ_Paused()` | Contract is paused |
+| `YZ_DepositsPaused()` | Deposits are paused |
+| `YZ_RedemptionsPaused()` | Redemptions are paused |
 | `YZ_NotAdmin()` | Caller not admin |
 | `YZ_ZeroAddress()` | Zero address provided |
 | `YZ_TVLCapExceeded(currentTVL, amount, cap)` | TVL cap exceeded |
@@ -766,7 +790,7 @@ When the contract is **paused**, retry attempts will still revert:
 ## Quick Start
 
 ```solidity
-import {YZEnforcedComposer} from "./sdk/YZEnforcedComposer.sol";
+import {YZEnforcedComposer} from "./src/YZEnforcedComposer.sol";
 
 // Deploy
 YZEnforcedComposer composer = new YZEnforcedComposer(
@@ -782,8 +806,8 @@ composer.setUserCap(user, 100_000 * 1e6); // 100K per user
 composer.setWhitelistEnabled(false);     // Open access
 
 // Emergency
-composer.pause();    // Stop all operations
-composer.unpause();  // Resume
+composer.pauseDeposits();    // Pause deposits only
+composer.unpauseDeposits();  // Resume deposits
 ```
 
 ---

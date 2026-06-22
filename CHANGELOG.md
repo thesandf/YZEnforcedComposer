@@ -4,6 +4,22 @@ All notable changes to the YieldZero Enforced Composer repository will be docume
 
 ---
 
+## [1.2.0] - 2026-06-04
+
+### Added
+* **Pinned Parent Library Version**: Added a public constant `PARENT_VERSION_PINNED = "ovault-evm@1.0.0"` to explicitly pin and track the parent dependency version, mitigating the version-coupling maintenance risk of the actual share-tracking mechanism.
+* **Security Finding Validation Tests**: Added a complete verification test suite in `test/security/YZEnforcedComposerFindingValidation.t.sol` to verify correctness of pause, whitelist, share tracking, and low-decimal asset behaviors.
+
+### Fixed
+* **Cross-Chain Pause Bypass**: Added pause controls inside `_depositAndSend(...)` and `_redeemAndSend(...)` execution paths to prevent bypassing paused states via inbound LayerZero `lzCompose()` calls.
+* **Cross-Chain Whitelist Bypass**: Enforced whitelisting inside `_depositAndSend(...)` to ensure compose-path deposits verify whitelisted status.
+* **`userShares` Inflation**: Overrode the internal `_deposit(...)` function to capture actual minted vault shares using the `_tempSharesMinted` state variable, eliminating total supply post-deposit ratio estimation errors.
+* **Redemption DoS Underflow**: Patched `decimalConversionRate` calculation fallback in `_redeemAndSend(...)` to safely handle low-decimal assets (< 6 decimals), preventing arithmetic underflow panics.
+* **`canDeposit` Mismatch**: Synchronized the user cap verification formula in `canDeposit()` to use the same conversion calculations as `_depositAndSend(...)`.
+* **Gas Regression Limits**: Adjusted `MAX_GAS_LIMIT` to `515000` in the regression tests to cover validation check gas requirements.
+
+---
+
 ## [1.1.0] - 2026-05-18
 
 ### Security Remediation

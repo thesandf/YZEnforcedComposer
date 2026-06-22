@@ -21,7 +21,7 @@ The `YZEnforcedComposer` contract operates on the execution-level boundary to en
   * Modify individual and batch user deposit caps (`setUserCap`, `batchSetUserCaps`).
   * Enable/disable global whitelisting (`setWhitelistEnabled`, `setWhitelist`, `batchSetWhitelist`).
   * Execute emergency pausing (`pauseDeposits`, `pauseRedemptions`, `pauseAll`).
-  * Withdraw accidentally stuck funds (`emergencyWithdraw`, `emergencyWithdrawShares`, `emergencyWithdrawNative`).
+  * Withdraw stuck funds (`emergencyWithdraw`, `emergencyWithdrawShares`, `emergencyWithdrawNative`). This introduces a **custodial assumption**: if a cross-chain compose retry or refund path temporarily leaves user assets/shares inside the composer contract, the admin has the technical power to withdraw them. Users must trust the admin not to act maliciously during these periods.
   * **Mitigation**: In production networks, this role MUST reside within a multi-signature wallet (e.g., Gnosis Safe 3-of-5) or a decentralized governance time-lock.
 
 ### B. Core Integration Trust Boundaries
